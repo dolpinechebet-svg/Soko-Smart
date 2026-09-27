@@ -2,5 +2,7 @@
   "name": "Soko Smart - Agentic B2B Coordination Platform",
   "description": "Trade-agnostic AI coordinator for Kenyan informal businesses (hardware, salons, kibandas, tailors, dukas, and produce vendors) to pool demand over WhatsApp/SMS, negotiate wholesale bulk orders, generate bilingual micro-agreements, and settle via M-PESA.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -31,9 +31,41 @@ import {
 } from './data/seedData';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>('whatsapp');
   const [businesses, setBusinesses] = useState<BusinessOwner[]>(INITIAL_BUSINESS_OWNERS);
-  const [selectedBusiness, setSelectedBusiness] = useState<BusinessOwner>(INITIAL_BUSINESS_OWNERS[0]);
+  
+  // Persistent Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const storedAuth = localStorage.getItem('soko_smart_auth');
+      return storedAuth !== 'false'; // default authenticated for smooth initial demo, but togglable
+    } catch {
+      return true;
+    }
+  });
+
+  const [selectedBusiness, setSelectedBusiness] = useState<BusinessOwner>(() => {
+    try {
+      const storedUserId = localStorage.getItem('soko_smart_user_id');
+      if (storedUserId) {
+        const found = INITIAL_BUSINESS_OWNERS.find(b => b.id === storedUserId);
+        if (found) return found;
+      }
+    } catch {
+      // ignore
+    }
+    return INITIAL_BUSINESS_OWNERS[0];
+  });
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try {
+      const storedAuth = localStorage.getItem('soko_smart_auth');
+      if (storedAuth === 'false') return 'login';
+    } catch {
+      // ignore
+    }
+    return 'whatsapp';
+  });
+
   const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCT_CATALOG);
   const [clusters, setClusters] = useState<DemandCluster[]>(INITIAL_CLUSTERS);
   const [orders, setOrders] = useState<DemandOrder[]>(INITIAL_ORDERS);
@@ -54,7 +86,7 @@ export default function App() {
         return saved;
       }
     } catch {
-      // fallback to initial
+      // fallback
     }
     return INITIAL_BUSINESS_OWNERS[0]?.preferredLanguage || 'swahili';
   });
@@ -127,7 +159,7 @@ export default function App() {
     try {
       localStorage.setItem('soko_smart_lang', newLang);
     } catch {
-      // ignore storage errors
+      // ignore
     }
     if (selectedBusiness) {
       setSelectedBusiness(prev => ({ ...prev, preferredLanguage: newLang }));
@@ -136,12 +168,31 @@ export default function App() {
 
   const handleUserLogin = (user: BusinessOwner) => {
     setSelectedBusiness(user);
+    setIsAuthenticated(true);
+    try {
+      localStorage.setItem('soko_smart_auth', 'true');
+      localStorage.setItem('soko_smart_user_id', user.id);
+    } catch {
+      // ignore
+    }
     if (user.preferredLanguage) {
       handleLanguageChange(user.preferredLanguage);
     }
     if (user.category) {
       setSelectedTrade(user.category);
     }
+    // Switch to WhatsApp or Clustering on successful login
+    setActiveTab('whatsapp');
+  };
+
+  const handleUserLogout = () => {
+    setIsAuthenticated(false);
+    try {
+      localStorage.setItem('soko_smart_auth', 'false');
+    } catch {
+      // ignore
+    }
+    setActiveTab('login');
   };
 
   const handleLockCluster = async (clusterId: string) => {
@@ -193,7 +244,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-stone-900 font-sans flex flex-col">
-      {/* Top Application Header with Language Preferences & Identity */}
+      {/* Top Application Header */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -205,6 +256,8 @@ export default function App() {
         currentLanguage={currentLanguage}
         onLanguageChange={handleLanguageChange}
         currentUser={selectedBusiness}
+        isAuthenticated={isAuthenticated}
+        onLogout={handleUserLogout}
       />
 
       {/* Main Workspace Body */}
@@ -215,10 +268,12 @@ export default function App() {
             currentLanguage={currentLanguage}
             onLanguageChange={handleLanguageChange}
             currentUser={selectedBusiness}
+            isAuthenticated={isAuthenticated}
             onUserLogin={handleUserLogin}
+            onLogout={handleUserLogout}
             allBusinesses={businesses}
             onRefreshBusinesses={refreshAllData}
-            onNavigateToWhatsApp={() => setActiveTab('whatsapp')}
+            onNavigateToWorkspace={() => setActiveTab('whatsapp')}
           />
         )}
 

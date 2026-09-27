@@ -8,7 +8,10 @@ import {
   CheckCircle2,
   ChevronDown,
   Layers,
-  ArrowRight
+  ArrowRight,
+  LogIn,
+  LogOut,
+  Sparkles
 } from 'lucide-react';
 import { BusinessOwner, Language, BusinessTradeCategory } from '../types';
 import { getTranslations } from '../utils/translations';
@@ -23,7 +26,9 @@ interface NavbarProps {
   setSelectedTradeFilter: (trade: string) => void;
   currentLanguage: Language;
   onLanguageChange: (lang: Language) => void;
-  currentUser: BusinessOwner;
+  currentUser: BusinessOwner | null;
+  isAuthenticated: boolean;
+  onLogout: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -36,9 +41,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   setSelectedTradeFilter,
   currentLanguage,
   onLanguageChange,
-  currentUser
+  currentUser,
+  isAuthenticated,
+  onLogout
 }) => {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const t = getTranslations(currentLanguage);
 
   const tabs = [
@@ -64,7 +72,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => setActiveTab('whatsapp')}>
+          <div
+            className="flex items-center gap-3 cursor-pointer shrink-0"
+            onClick={() => setActiveTab(isAuthenticated ? 'whatsapp' : 'login')}
+          >
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 font-extrabold text-base shadow-inner tracking-wider">
               SS
             </div>
@@ -97,7 +108,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Quick Language Preference Selector (User requested: "and also where to change the language preferences") */}
+            {/* Quick Language Preference Selector */}
             <div className="relative">
               <button
                 type="button"
@@ -150,7 +161,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }}
                         className="w-full text-center py-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
                       >
-                        More Language & Identity Settings →
+                        Language & Identity Settings →
                       </button>
                     </div>
                   </div>
@@ -159,30 +170,99 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Individual Identity Login / Profile Card Button */}
-            <button
-              onClick={() => setActiveTab('login')}
-              className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
-                activeTab === 'login'
-                  ? 'bg-emerald-800 text-white border-emerald-400 ring-2 ring-emerald-400/40 shadow-sm'
-                  : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-white border-emerald-700/60'
-              }`}
-              title="View identity or switch trader"
-            >
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold text-xs shrink-0">
-                {currentUser?.ownerName
-                  ? currentUser.ownerName.split(' ').map(n => n[0]).slice(0, 2).join('')
-                  : 'ID'}
+            {isAuthenticated && currentUser ? (
+              <div className="relative">
+                <button
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                    activeTab === 'login'
+                      ? 'bg-emerald-800 text-white border-emerald-400 ring-2 ring-emerald-400/40 shadow-sm'
+                      : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-white border-emerald-700/60'
+                  }`}
+                  title="View identity or log out"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold text-xs shrink-0">
+                    {currentUser.ownerName
+                      ? currentUser.ownerName.split(' ').map(n => n[0]).slice(0, 2).join('')
+                      : 'ID'}
+                  </div>
+                  <div className="text-left hidden sm:block">
+                    <div className="font-bold text-xs leading-tight text-white flex items-center gap-1">
+                      <span>{currentUser.ownerName}</span>
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                    </div>
+                    <div className="text-[10px] text-emerald-300/80 leading-tight truncate max-w-[130px]">
+                      {currentUser.businessName}
+                    </div>
+                  </div>
+                  <ChevronDown className="w-3 h-3 text-emerald-300 hidden sm:block" />
+                </button>
+
+                {userDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setUserDropdownOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-64 rounded-xl bg-white text-stone-900 shadow-xl border border-stone-200 py-2 z-50 animate-fadeIn">
+                      <div className="px-4 py-2 border-b border-stone-100">
+                        <div className="font-bold text-sm text-stone-900">{currentUser.ownerName}</div>
+                        <div className="text-xs text-stone-600">{currentUser.businessName}</div>
+                        <div className="text-[11px] text-emerald-700 font-medium mt-0.5 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Verified Kenyan Merchant · {currentUser.ward}</span>
+                        </div>
+                      </div>
+
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            setActiveTab('login');
+                            setUserDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs font-semibold text-stone-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2"
+                        >
+                          <User className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>View Digital Trader ID & Settings</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveTab('login');
+                            setUserDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs font-semibold text-stone-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2"
+                        >
+                          <Globe className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Change Language Preferences</span>
+                        </button>
+                      </div>
+
+                      <div className="pt-1 border-t border-stone-100">
+                        <button
+                          onClick={() => {
+                            setUserDropdownOpen(false);
+                            onLogout();
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>Log Out / Ondoka</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="text-left hidden sm:block">
-                <div className="font-bold text-xs leading-tight text-white flex items-center gap-1">
-                  <span>{currentUser?.ownerName || 'Log In / Identity'}</span>
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                </div>
-                <div className="text-[10px] text-emerald-300/80 leading-tight truncate max-w-[130px]">
-                  {currentUser?.businessName || 'Verified Trader'}
-                </div>
-              </div>
-            </button>
+            ) : (
+              <button
+                onClick={() => setActiveTab('login')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 text-xs font-bold shadow-md transition-all active:scale-95"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Log In / Ingia</span>
+              </button>
+            )}
           </div>
         </div>
 
