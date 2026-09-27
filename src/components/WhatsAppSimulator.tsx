@@ -12,14 +12,20 @@ import {
   FileText,
   Volume2,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Hammer,
+  Scissors,
+  Apple,
+  Utensils,
+  ShoppingBag,
+  RotateCcw
 } from 'lucide-react';
-import { MamaMbogaVendor, NluParseResult } from '../types';
+import { BusinessOwner, NluParseResult, BusinessTradeCategory } from '../types';
 
 interface WhatsAppSimulatorProps {
-  vendors: MamaMbogaVendor[];
-  selectedVendor: MamaMbogaVendor;
-  setSelectedVendor: (v: MamaMbogaVendor) => void;
+  businesses: BusinessOwner[];
+  selectedBusiness: BusinessOwner;
+  setSelectedBusiness: (b: BusinessOwner) => void;
   onOrderCreated?: () => void;
   onAgreementConfirmed?: () => void;
   onOpenAgreementsTab: () => void;
@@ -27,20 +33,19 @@ interface WhatsAppSimulatorProps {
 
 interface MessageBubble {
   id: string;
-  sender: 'vendor' | 'agent';
+  sender: 'trader' | 'agent';
   text: string;
   timestamp: string;
   isAudio?: boolean;
   audioDuration?: string;
   quickReplies?: { title: string; payload: string }[];
   isAgreementNotice?: boolean;
-  agreementId?: string;
 }
 
 export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
-  vendors,
-  selectedVendor,
-  setSelectedVendor,
+  businesses,
+  selectedBusiness,
+  setSelectedBusiness,
   onOrderCreated,
   onAgreementConfirmed,
   onOpenAgreementsTab
@@ -65,16 +70,15 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize conversation for selected vendor
   useEffect(() => {
-    loadVendorSession(selectedVendor.phone);
-  }, [selectedVendor.phone]);
+    loadTraderSession(selectedBusiness.phone);
+  }, [selectedBusiness.phone]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, stkDialog]);
 
-  const loadVendorSession = async (phone: string) => {
+  const loadTraderSession = async (phone: string) => {
     try {
       const res = await fetch(`/api/chat/session/${encodeURIComponent(phone)}`);
       if (res.ok) {
@@ -82,7 +86,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
         if (session.history && session.history.length > 0) {
           const formatted: MessageBubble[] = session.history.map((h: any, i: number) => ({
             id: `msg-${i}`,
-            sender: h.role === 'vendor' ? 'vendor' : 'agent',
+            sender: h.role === 'trader' ? 'trader' : 'agent',
             text: h.text,
             timestamp: new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }));
@@ -94,15 +98,28 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
       console.warn('Could not load session from server:', e);
     }
 
-    // Default greeting if session not found
     setMessages([
       {
         id: 'msg-0',
         sender: 'agent',
-        text: `Habari ${selectedVendor.name}! Mimi ni Soko Smart, mratibu wako wa ununuzi wa pamoja Makadara.\n\nNiambie nini unahitaji kesho (kwa mfano: "Nataka magunia 2 ya nyanya na debe 1 ya viazi kesho asubuhi") kwa sauti au ujumbe mfupi.`,
-        timestamp: '07:00 AM'
+        text: `Habari ${selectedBusiness.ownerName}! Mimi ni Soko Smart, mratibu wako wa ununuzi wa pamoja wa bidhaa za jumla.\n\nNiambie nini unahitaji leo kwa ajili ya ${selectedBusiness.businessName} (kwa mfano kuandika au kutuma sauti).`,
+        timestamp: '07:30 AM'
       }
     ]);
+  };
+
+  const handleResetSession = async () => {
+    try {
+      const res = await fetch(`/api/chat/reset/${encodeURIComponent(selectedBusiness.phone)}`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        loadTraderSession(selectedBusiness.phone);
+        setLastNluResult(null);
+      }
+    } catch (err) {
+      console.error('Reset error:', err);
+    }
   };
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -110,8 +127,8 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
     if (!text.trim() || isLoading) return;
 
     const userMessage: MessageBubble = {
-      id: `msg-${Date.now()}-v`,
-      sender: 'vendor',
+      id: `msg-${Date.now()}-t`,
+      sender: 'trader',
       text: text.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
@@ -125,7 +142,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: selectedVendor.phone,
+          phone: selectedBusiness.phone,
           text: text.trim()
         })
       });
@@ -144,10 +161,9 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
         setMessages(prev => [...prev, agentMessage]);
 
-        // If STK Push was triggered by NDIYO/confirmation
         if (data.triggerStkPush) {
           setTimeout(() => {
-            triggerMpesaPrompt(data.stkAmount || 3510);
+            triggerMpesaPrompt(data.stkAmount || 6600);
           }, 800);
           onAgreementConfirmed?.();
         }
@@ -163,18 +179,17 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
     }
   };
 
-  // Trigger simulated Safaricom STK Push dialog on vendor phone
   const triggerMpesaPrompt = async (amount: number) => {
     try {
       const res = await fetch('/api/mpesa/stkpush', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vendorId: selectedVendor.id,
-          phone: selectedVendor.phone,
+          businessId: selectedBusiness.id,
+          phone: selectedBusiness.phone,
           amountKsh: amount,
-          purpose: 'vendor_pool_collection',
-          agreementId: 'SS-MKD-260928-001'
+          purpose: 'trader_pool_collection',
+          agreementId: 'SK254-MKD-HW-260929-01'
         })
       });
 
@@ -185,7 +200,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
           checkoutRequestId: data.checkoutRequestId,
           amount: amount,
           title: 'SIM TOOLKIT · M-PESA',
-          prompt: `Do you want to pay KSh ${amount.toLocaleString()} to SOKO SMART TILL 174379 for Makadara Produce Pool?`,
+          prompt: `Do you want to pay KSh ${amount.toLocaleString()} to SOKO SMART TILL 400200 for Pooled Bulk Order?`,
           pin: '',
           status: 'idle'
         });
@@ -197,7 +212,6 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
   const handleStkPinSubmit = async () => {
     if (!stkDialog || !stkDialog.pin || stkDialog.pin.length < 4) return;
-
     setStkDialog(prev => prev ? { ...prev, status: 'processing' } : null);
 
     try {
@@ -217,13 +231,12 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
         setTimeout(() => {
           setStkDialog(null);
-          // Post receipt notice in chat
           setMessages(prev => [
             ...prev,
             {
               id: `msg-${Date.now()}-receipt`,
               sender: 'agent',
-              text: `✅ MALIPO YAMEPOKELEWA!\n\nStakabadhi ya M-PESA: ${data.tx.mpesaReceiptNumber}\nKiasi: KSh ${stkDialog.amount.toLocaleString()}\nKutoka: ${selectedVendor.phone}\nKuelekea: Soko Smart Escrow Suspense.\n\nMboga zako zitawasilishwa Hamza Market kabla ya 06:30 AM kesho. Ujumbe wa gari likiwasili utatumwa hapa.`,
+              text: `✅ MALIPO YAMEPOKELEWA!\n\nStakabadhi ya M-PESA: ${data.tx.mpesaReceiptNumber}\nKiasi: KSh ${stkDialog.amount.toLocaleString()}\nKutoka: ${selectedBusiness.phone}\nKuelekea: Soko Smart Escrow Suspense.\n\nMzigo wako unaletwa Hamza Central Staging Hub kesho asubuhi. Ujumbe wa nambari ya lori utatumwa hapa.`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }
           ]);
@@ -246,10 +259,9 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        // Add as voice note bubble
         const userAudioMsg: MessageBubble = {
           id: `msg-${Date.now()}-voice`,
-          sender: 'vendor',
+          sender: 'trader',
           text: `🎙️ Sauti: "${data.transcription}"`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isAudio: true,
@@ -257,12 +269,11 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
         };
         setMessages(prev => [...prev, userAudioMsg]);
 
-        // Process through coordinator
         const chatRes = await fetch('/api/chat/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            phone: selectedVendor.phone,
+            phone: selectedBusiness.phone,
             text: data.transcription
           })
         });
@@ -296,53 +307,80 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
     setIsRecording(true);
     setTimeout(() => {
       setIsRecording(false);
-      handleAudioSample('sample_sarah_nyanya');
-    }, 2000);
+      handleAudioSample(
+        selectedBusiness.category === 'hardware'
+          ? 'sample_hardware_cement'
+          : selectedBusiness.category === 'salon_beauty'
+          ? 'sample_salon_braids'
+          : 'sample_tailoring_kanga'
+      );
+    }, 1800);
+  };
+
+  const getTradeBadge = (cat: BusinessTradeCategory) => {
+    switch (cat) {
+      case 'hardware':
+        return { label: 'Hardware', color: 'bg-amber-100 text-amber-900 border-amber-300', icon: Hammer };
+      case 'salon_beauty':
+        return { label: 'Salon & Beauty', color: 'bg-pink-100 text-pink-900 border-pink-300', icon: Sparkles };
+      case 'tailoring_textiles':
+        return { label: 'Tailoring', color: 'bg-purple-100 text-purple-900 border-purple-300', icon: Scissors };
+      case 'produce_kiosk':
+        return { label: 'Mama Mboga', color: 'bg-emerald-100 text-emerald-900 border-emerald-300', icon: Apple };
+      case 'kibanda_food':
+        return { label: 'Food Kibanda', color: 'bg-orange-100 text-orange-900 border-orange-300', icon: Utensils };
+      default:
+        return { label: cat, color: 'bg-stone-100 text-stone-800 border-stone-300', icon: ShoppingBag };
+    }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* Left Column: Vendor Persona & Sheng/Swahili Test Control Deck */}
+      {/* Left Column: Trade Persona Switcher & Sheng Voice Tester */}
       <div className="lg:col-span-4 space-y-4">
-        {/* Vendor Persona Selector Card */}
+        {/* Trade Persona Selector Card */}
         <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
-              Mama Mboga Simulator
+              Trader Persona Switcher
             </span>
-            <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
-              Makadara Corridor
+            <span className="text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded font-medium border border-emerald-200">
+              Kenya Multi-Trade
             </span>
           </div>
 
           <label className="block text-xs text-stone-600 mb-1.5 font-medium">
-            Select Active Vendor Persona:
+            Select Active Small Business Owner:
           </label>
           <div className="space-y-2">
-            {vendors.map(v => {
-              const isSelected = v.id === selectedVendor.id;
+            {businesses.map(b => {
+              const isSelected = b.id === selectedBusiness.id;
+              const badge = getTradeBadge(b.category);
+              const IconComp = badge.icon;
+
               return (
                 <button
-                  key={v.id}
-                  onClick={() => setSelectedVendor(v)}
+                  key={b.id}
+                  onClick={() => setSelectedBusiness(b)}
                   className={`w-full text-left p-3 rounded-lg border transition-all ${
                     isSelected
-                      ? 'border-emerald-600 bg-emerald-50/50 shadow-xs ring-1 ring-emerald-600'
-                      : 'border-stone-200 hover:border-stone-300 bg-stone-50/50'
+                      ? 'border-emerald-600 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-600'
+                      : 'border-stone-200 hover:border-stone-300 bg-stone-50/40'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-stone-900">{v.name}</span>
-                    <span className="text-xs text-stone-500 font-mono">{v.phone}</span>
+                    <span className="text-sm font-bold text-stone-900">{b.ownerName}</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 ${badge.color}`}>
+                      <IconComp className="w-3 h-3" />
+                      {badge.label}
+                    </span>
                   </div>
-                  <div className="text-xs text-stone-600 mt-0.5 flex items-center justify-between">
-                    <span>{v.stallLocation}</span>
-                    <span className="text-stone-400 capitalize">{v.preferredLanguage}</span>
+                  <div className="text-xs text-stone-700 font-medium mt-0.5">
+                    {b.businessName}
                   </div>
-                  <div className="text-[11px] text-emerald-800 mt-1 flex items-center gap-2">
-                    <span>Reputation: {v.reputationScore.fulfillmentRate}% on-time</span>
-                    <span>·</span>
-                    <span>{v.reputationScore.totalOrders} bulk cycles</span>
+                  <div className="text-[11px] text-stone-500 mt-1 flex items-center justify-between">
+                    <span>{b.locationDesc}</span>
+                    <span className="font-mono text-stone-400">{b.phone}</span>
                   </div>
                 </button>
               );
@@ -350,72 +388,86 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
           </div>
         </div>
 
-        {/* Quick Voice Note Audio Injector Card */}
+        {/* Voice Note Audio Testing Deck */}
         <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5">
-              <Volume2 className="w-4 h-4 text-emerald-700" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-stone-800">
-                Voice Note Testing (Sheng / Swahili)
+              <Volume2 className="w-4 h-4 text-emerald-800" />
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                Voice Ingestion by Trade (Sheng / Swahili)
               </span>
             </div>
           </div>
-          <p className="text-xs text-stone-600 mb-3">
-            Vendors frequently use voice notes while attending stalls. Test our code-switching STT engine:
+          <p className="text-xs text-stone-500 mb-3">
+            Traders on market stalls use quick audio notes. Test Soko Smart's domain speech recognition:
           </p>
 
           <div className="space-y-2 text-xs">
             <button
-              onClick={() => handleAudioSample('sample_sarah_nyanya')}
+              onClick={() => handleAudioSample('sample_hardware_cement')}
               disabled={isLoading}
-              className="w-full text-left p-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 transition-colors flex items-start gap-2.5"
+              className="w-full text-left p-2.5 rounded-lg border border-amber-200 bg-amber-50/30 hover:bg-amber-50 transition-colors flex items-start gap-2.5"
             >
-              <Play className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+              <Play className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
               <div>
-                <span className="font-medium text-stone-800 block">Sheng Order (Mama Sarah)</span>
-                <span className="text-stone-500 italic text-[11px]">
-                  "Niaje Soko Smart, nataka magunia tatu za nyanya na debe tano za viazi..."
+                <span className="font-bold text-amber-950 block">Hardware Audio (John Kamau)</span>
+                <span className="text-amber-800 italic text-[11px]">
+                  "Niaje Soko Smart, nataka mifuko 20 ya saruji simiti Bamburi..."
                 </span>
               </div>
             </button>
 
             <button
-              onClick={() => handleAudioSample('sample_wambui_sukuma')}
+              onClick={() => handleAudioSample('sample_salon_braids')}
               disabled={isLoading}
-              className="w-full text-left p-2.5 rounded-lg border border-stone-200 hover:bg-stone-50 transition-colors flex items-start gap-2.5"
+              className="w-full text-left p-2.5 rounded-lg border border-pink-200 bg-pink-50/30 hover:bg-pink-50 transition-colors flex items-start gap-2.5"
             >
-              <Play className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+              <Play className="w-3.5 h-3.5 text-pink-700 shrink-0 mt-0.5" />
               <div>
-                <span className="font-medium text-stone-800 block">Swahili Order (Mama Wambui)</span>
-                <span className="text-stone-500 italic text-[11px]">
-                  "Habari ya jioni. Kesho asubuhi nahitaji sukuma wiki kilo arobaini..."
+                <span className="font-bold text-pink-950 block">Salon Audio (Grace Wanjiru)</span>
+                <span className="text-pink-800 italic text-[11px]">
+                  "Habari Soko Smart. Nahitaji carton 1 ya Darling Abuja braids..."
                 </span>
               </div>
             </button>
 
             <button
-              onClick={() => handleAudioSample('sample_achieng_tatizo')}
+              onClick={() => handleAudioSample('sample_tailoring_kanga')}
               disabled={isLoading}
-              className="w-full text-left p-2.5 rounded-lg border border-rose-200 bg-rose-50/30 hover:bg-rose-50 transition-colors flex items-start gap-2.5"
+              className="w-full text-left p-2.5 rounded-lg border border-purple-200 bg-purple-50/30 hover:bg-purple-50 transition-colors flex items-start gap-2.5"
+            >
+              <Play className="w-3.5 h-3.5 text-purple-700 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-purple-950 block">Tailoring Audio (Mercy Achieng)</span>
+                <span className="text-purple-800 italic text-[11px]">
+                  "Hallow, nataka roli 3 za kitambaa cha kanga na uzi wa mashine..."
+                </span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleAudioSample('sample_dispute_hardware')}
+              disabled={isLoading}
+              className="w-full text-left p-2.5 rounded-lg border border-rose-200 bg-rose-50/40 hover:bg-rose-50 transition-colors flex items-start gap-2.5"
             >
               <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-medium text-rose-900 block">Dispute Voice ("TATIZO")</span>
-                <span className="text-rose-700 italic text-[11px]">
-                  "Hallow Soko Smart, TATIZO. Gunia moja ya nyanya niliyopokea..."
+                <span className="font-bold text-rose-950 block">Dispute Audio ("TATIZO")</span>
+                <span className="text-rose-800 italic text-[11px]">
+                  "Hallow Soko Smart, TATIZO. Mabati matatu tuliyoshusha yamepondoka..."
                 </span>
               </div>
             </button>
           </div>
         </div>
 
-        {/* NLU Parsing Inspector */}
+        {/* Live NLU Schema Inspector */}
         {lastNluResult && (
           <div className="bg-stone-900 text-stone-200 rounded-xl p-4 text-xs font-mono shadow-xs border border-stone-800">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-800">
               <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
-                Live NLU Output Schema
+                Soko Smart NLU Schema Output
               </span>
               <span className="text-[10px] bg-stone-800 px-1.5 py-0.5 rounded text-stone-300">
                 {(lastNluResult.confidence * 100).toFixed(0)}% Conf
@@ -427,14 +479,14 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
                 <span className="text-amber-300 font-bold">{lastNluResult.intent}</span>
               </div>
               <div>
-                <span className="text-stone-400">Lang: </span>
-                <span className="text-emerald-300 uppercase">{lastNluResult.detectedLanguage}</span>
+                <span className="text-stone-400">Inferred Category: </span>
+                <span className="text-emerald-300 font-semibold">{lastNluResult.inferredCategory || 'general'}</span>
               </div>
               {lastNluResult.extractedEntities.map((ent, idx) => (
-                <div key={idx} className="bg-stone-800/80 p-1.5 rounded mt-1 text-[11px]">
-                  <div className="text-white font-medium">{ent.produceName}</div>
+                <div key={idx} className="bg-stone-800/80 p-2 rounded mt-1 text-[11px]">
+                  <div className="text-white font-medium">{ent.productName}</div>
                   <div className="text-stone-300">
-                    {ent.quantity} {ent.unit} (~{ent.normalizedKg} kg)
+                    {ent.quantity} {ent.unit} (~{ent.normalizedBaseQty} base)
                   </div>
                 </div>
               ))}
@@ -445,66 +497,73 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
       {/* Right Column: High-Fidelity WhatsApp Phone Simulation */}
       <div className="lg:col-span-8 flex justify-center">
-        <div className="w-full max-w-[440px] bg-[#111B21] rounded-[36px] p-3 shadow-2xl border-4 border-stone-800 relative overflow-hidden">
+        <div className="w-full max-w-[440px] bg-[#111B21] rounded-[38px] p-3 shadow-2xl border-4 border-stone-800 relative overflow-hidden">
           {/* Phone Speaker Notch */}
           <div className="w-28 h-4 bg-stone-950 rounded-full mx-auto mb-2 flex items-center justify-center">
             <div className="w-8 h-1 bg-stone-800 rounded-full"></div>
           </div>
 
           {/* WhatsApp Interface Container */}
-          <div className="bg-[#EFEAE2] rounded-[24px] overflow-hidden flex flex-col h-[680px] relative shadow-inner">
+          <div className="bg-[#EFEAE2] rounded-[24px] overflow-hidden flex flex-col h-[690px] relative shadow-inner">
             {/* WhatsApp App Header */}
             <div className="bg-[#008069] text-white px-4 py-3 flex items-center justify-between shrink-0 shadow-sm">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-emerald-800 border border-emerald-400/40 flex items-center justify-center font-bold text-sm text-emerald-200">
+                <div className="w-9 h-9 rounded-full bg-emerald-950 border border-emerald-400/50 flex items-center justify-center font-bold text-xs text-emerald-200 shadow-inner">
                   SS
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-sm leading-tight">Soko Smart Coordinator</span>
+                    <span className="font-bold text-[15px] leading-tight text-white tracking-wide">
+                      Soko Smart
+                    </span>
                     <span className="w-2 h-2 rounded-full bg-emerald-300 inline-block"></span>
                   </div>
                   <span className="text-[11px] text-emerald-100/90 block leading-tight">
-                    Msaidizi wa Makadara Mama Mboga
+                    Msaidizi wa Ununuzi wa Pamoja
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-white/80">
-                <Phone className="w-4 h-4 cursor-pointer hover:text-white" />
+              <div className="flex items-center gap-2 text-white/80">
+                <button
+                  onClick={handleResetSession}
+                  title="Reset Chat Session"
+                  className="p-1 hover:text-white transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
                 <MoreVertical className="w-4 h-4 cursor-pointer hover:text-white" />
               </div>
             </div>
 
             {/* Chat Messages Stream */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-[radial-gradient(#d4cbbe_1px,transparent_1px)] [background-size:16px_16px]">
-              {/* WhatsApp Security Notice */}
               <div className="text-center my-1">
                 <span className="bg-[#FFF4C7] text-[#54656F] text-[10px] px-2.5 py-1 rounded-md shadow-2xs inline-block max-w-[90%]">
-                  🔒 Messages are coordinated securely via Soko Smart for Makadara Produce Pool.
+                  🔒 Soko Smart B2B Pooling Gateway · Safaricom M-PESA Daraja Certified
                 </span>
               </div>
 
               {messages.map(msg => {
-                const isVendor = msg.sender === 'vendor';
+                const isTrader = msg.sender === 'trader';
                 return (
                   <div
                     key={msg.id}
-                    className={`flex flex-col ${isVendor ? 'items-end' : 'items-start'}`}
+                    className={`flex flex-col ${isTrader ? 'items-end' : 'items-start'}`}
                   >
                     <div
                       className={`max-w-[85%] rounded-lg px-3 py-2 text-xs shadow-2xs leading-relaxed ${
-                        isVendor
+                        isTrader
                           ? 'bg-[#E7FFDB] text-[#111B21] rounded-tr-none'
                           : 'bg-white text-[#111B21] rounded-tl-none'
                       }`}
                     >
                       {msg.isAudio ? (
-                        <div className="flex items-center gap-2.5 py-1 min-w-[190px]">
+                        <div className="flex items-center gap-2.5 py-1 min-w-[200px]">
                           <button
                             onClick={() =>
                               setIsPlayingAudio(isPlayingAudio === msg.id ? null : msg.id)
                             }
-                            className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0"
+                            className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0"
                           >
                             {isPlayingAudio === msg.id ? (
                               <Pause className="w-3.5 h-3.5" />
@@ -521,7 +580,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
                               ></div>
                             </div>
                             <span className="text-[10px] text-stone-500 mt-1 block">
-                              {msg.audioDuration || '0:06'} · Voice Note
+                              {msg.audioDuration || '0:07'} · Voice Note
                             </span>
                           </div>
                         </div>
@@ -531,11 +590,11 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
                       <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-stone-400">
                         <span>{msg.timestamp}</span>
-                        {isVendor && <CheckCheck className="w-3.5 h-3.5 text-blue-500" />}
+                        {isTrader && <CheckCheck className="w-3.5 h-3.5 text-blue-500" />}
                       </div>
                     </div>
 
-                    {/* Quick Reply Chips if provided by Coordinator */}
+                    {/* Quick Reply Chips */}
                     {msg.quickReplies && msg.quickReplies.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5 max-w-[85%]">
                         {msg.quickReplies.map((qr, qidx) => (
@@ -567,7 +626,7 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
 
             {/* Simulated Live Safaricom STK Push Dialog Overlay */}
             {stkDialog && stkDialog.visible && (
-              <div className="absolute inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
                 <div className="w-full max-w-[320px] bg-[#004D25] text-white rounded-2xl p-4 shadow-2xl border-2 border-emerald-400">
                   <div className="text-center pb-2 border-b border-emerald-700/60 mb-3">
                     <span className="font-bold tracking-widest text-xs text-emerald-300">
@@ -586,12 +645,12 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
                     <div className="py-4 text-center space-y-2">
                       <RefreshCw className="w-6 h-6 animate-spin text-emerald-300 mx-auto" />
                       <p className="text-xs text-emerald-200">
-                        Inatuma PIN na kuthibitisha na Safaricom...
+                        Inathibitisha PIN na Safaricom...
                       </p>
                     </div>
                   ) : stkDialog.status === 'success' ? (
                     <div className="py-3 text-center text-emerald-200 font-semibold text-xs">
-                      ✅ PIN Imekubaliwa! Malipo Yamekamilika.
+                      ✅ PIN Imekubaliwa! Amana ya Escrow Imelipwa.
                     </div>
                   ) : (
                     <>
@@ -632,28 +691,54 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
               </div>
             )}
 
-            {/* Quick Action Preset Chips for Vendor */}
+            {/* Quick Action Chips by Selected Trade */}
             <div className="bg-[#F0F2F5] px-2 py-1.5 border-t border-stone-200 flex gap-1.5 overflow-x-auto scrollbar-none text-[11px]">
               <button
-                onClick={() => handleSendMessage('Nataka magunia 2 ya nyanya kesho')}
-                className="whitespace-nowrap px-2.5 py-1 bg-white rounded-full border border-stone-300 text-stone-700 hover:border-emerald-600 hover:text-emerald-700"
+                onClick={() => handleSendMessage('Hi')}
+                className="whitespace-nowrap px-2.5 py-1 bg-white rounded-full border border-stone-300 text-stone-700 hover:border-emerald-600 hover:text-emerald-700 font-medium"
               >
-                🍅 2 Magunia Nyanya
+                👋 "Hi" (Onboarding)
               </button>
-              <button
-                onClick={() => handleSendMessage('Nipatie kilo 50 za sukuma wiki')}
-                className="whitespace-nowrap px-2.5 py-1 bg-white rounded-full border border-stone-300 text-stone-700 hover:border-emerald-600 hover:text-emerald-700"
-              >
-                🥬 50kg Sukuma
-              </button>
+              {selectedBusiness.category === 'hardware' && (
+                <button
+                  onClick={() => handleSendMessage('Nahitaji mifuko 20 ya saruji Bamburi')}
+                  className="whitespace-nowrap px-2.5 py-1 bg-white rounded-full border border-stone-300 text-stone-700 hover:border-emerald-600 hover:text-emerald-700"
+                >
+                  🧱 20 Mifuko Saruji
+                </button>
+              )}
+              {selectedBusiness.category === 'salon_beauty' && (
+                <button
+                  onClick={() => handleSendMessage('Carton 1 ya Darling Abuja braids #1')}
+                  className="whitespace-nowrap px-2.5 py-1 bg-white rounded-full border border-stone-300 text-stone-700 hover:border-emerald-600 hover:text-emerald-700"
+                >
+                  💇‍♀️ 1 Carton Braids
+                </button>
+              )}
+              {selectedBusiness.category === 'tailoring_textiles' && (
+                <button
+                  onClick={() => handleSendMessage('Roli 3 za kitambaa cha kanga')}
+                  className="whitespace-nowrap px-2.5 py-1 bg-white rounded-full border border-stone-300 text-stone-700 hover:border-emerald-600 hover:text-emerald-700"
+                >
+                  🧵 3 Roli za Kanga
+                </button>
+              )}
+              {selectedBusiness.category === 'produce_kiosk' && (
+                <button
+                  onClick={() => handleSendMessage('Magunia 3 ya nyanya kesho')}
+                  className="whitespace-nowrap px-2.5 py-1 bg-white rounded-full border border-stone-300 text-stone-700 hover:border-emerald-600 hover:text-emerald-700"
+                >
+                  🍅 3 Magunia Nyanya
+                </button>
+              )}
               <button
                 onClick={() => handleSendMessage('NDIYO')}
-                className="whitespace-nowrap px-2.5 py-1 bg-emerald-100 border border-emerald-400 text-emerald-900 font-semibold hover:bg-emerald-200"
+                className="whitespace-nowrap px-2.5 py-1 bg-emerald-100 border border-emerald-400 text-emerald-950 font-semibold hover:bg-emerald-200"
               >
-                ✍️ "NDIYO" (Thibitisha)
+                ✍️ "NDIYO"
               </button>
               <button
-                onClick={() => handleSendMessage('TATIZO nyanya zimeoza')}
+                onClick={() => handleSendMessage('TATIZO mzigo umeharibika')}
                 className="whitespace-nowrap px-2.5 py-1 bg-rose-50 border border-rose-300 text-rose-800 hover:bg-rose-100"
               >
                 ⚠️ "TATIZO"

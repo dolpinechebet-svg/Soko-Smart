@@ -9,7 +9,8 @@ import {
   Sparkles,
   Send,
   UserCheck,
-  FileCheck
+  FileCheck,
+  Building2
 } from 'lucide-react';
 import { NegotiationSession, DemandCluster } from '../types';
 
@@ -26,13 +27,13 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
   onAgreementDrafted,
   onNavigateToAgreements
 }) => {
-  const activeCluster = clusters.find(c => c.id === clusterId) || clusters[1] || clusters[0];
+  const activeCluster = clusters.find(c => c.id === clusterId) || clusters[0];
   const [session, setSession] = useState<NegotiationSession | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [simulatedCoopPrice, setSimulatedCoopPrice] = useState<number>(23);
-  const [simulatedCoopMessage, setSimulatedCoopMessage] = useState<string>('');
-  const [overridePrice, setOverridePrice] = useState<number>(29);
-  const [overrideNotes, setOverrideNotes] = useState<string>('Mvua kubwa imepandisha bei za kote Nairobi.');
+  const [simulatedSupplierPrice, setSimulatedSupplierPrice] = useState<number>(670);
+  const [simulatedSupplierMessage, setSimulatedSupplierMessage] = useState<string>('');
+  const [overridePrice, setOverridePrice] = useState<number>(750);
+  const [overrideNotes, setOverrideNotes] = useState<string>('Gharama za mafuta na malighafi zimeongezeka nchini.');
 
   useEffect(() => {
     if (activeCluster) {
@@ -47,6 +48,9 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
       if (res.ok) {
         const data = await res.json();
         setSession(data);
+        if (data.currentCounterPricePerUnit) {
+          setSimulatedSupplierPrice(Math.round(data.currentCounterPricePerUnit * 1.05));
+        }
       }
     } catch (err) {
       console.warn('Fetch session error:', err);
@@ -55,28 +59,28 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
     }
   };
 
-  const handleSendCoopReply = async (customPrice?: number, customMsg?: string) => {
+  const handleSendSupplierReply = async (customPrice?: number, customMsg?: string) => {
     if (!activeCluster) return;
-    const priceToSubmit = customPrice !== undefined ? customPrice : simulatedCoopPrice;
+    const priceToSubmit = customPrice !== undefined ? customPrice : simulatedSupplierPrice;
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/negotiation/${activeCluster.id}/coop-reply`, {
+      const res = await fetch(`/api/negotiation/${activeCluster.id}/supplier-reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          proposedPricePerKg: priceToSubmit,
-          message: customMsg || simulatedCoopMessage || `Ofa yetu ni KSh ${priceToSubmit} kwa kila kilo.`
+          proposedPricePerUnit: priceToSubmit,
+          message: customMsg || simulatedSupplierMessage || `Ofa yetu ya kiwanda ni KSh ${priceToSubmit} kwa unit.`
         })
       });
 
       if (res.ok) {
         const data = await res.json();
         setSession(data.session);
-        setSimulatedCoopMessage('');
+        setSimulatedSupplierMessage('');
       }
     } catch (err) {
-      console.error('Coop reply error:', err);
+      console.error('Supplier reply error:', err);
     } finally {
       setLoading(false);
     }
@@ -92,7 +96,7 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
-          approvedPricePerKg: overridePrice,
+          approvedPricePerUnit: overridePrice,
           notes: overrideNotes
         })
       });
@@ -130,7 +134,7 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
     return (
       <div className="bg-white rounded-xl border border-stone-200 p-8 text-center text-stone-500">
         <Scale className="w-8 h-8 text-stone-300 mx-auto mb-2 animate-bounce" />
-        <p className="text-sm font-medium">Inapakia mazungumzo ya chama cha wakulima...</p>
+        <p className="text-sm font-medium">Inapakia chumba cha mazungumzo ya msambazaji...</p>
       </div>
     );
   }
@@ -140,22 +144,22 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Negotiation Room Header & Status Card */}
+      {/* Header Banner */}
       <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
-                Bounded Autonomous Negotiation
+              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                Bounded Autonomous Supplier Negotiation
               </span>
               <span className="text-stone-300">·</span>
-              <span className="text-xs text-stone-500 font-mono">{activeCluster.id}</span>
+              <span className="text-xs font-mono text-stone-500 uppercase">{session.category}</span>
             </div>
             <h2 className="text-xl font-bold text-stone-900 tracking-tight">
-              {activeCluster.produceName} ({session.totalKg.toLocaleString()} kg) ↔ {session.cooperativeName}
+              {activeCluster.productName} ({session.totalUnits.toLocaleString()} units) ↔ {session.supplierName}
             </h2>
             <p className="text-xs text-stone-600 mt-1">
-              Agent coordinates with farm cooperative dispatch via WhatsApp/SMS under strict algorithmically enforced safety price bands.
+              Agent coordinates with wholesale depot dispatch via WhatsApp/SMS under strict algorithmically enforced safety price guardrails.
             </p>
           </div>
 
@@ -163,7 +167,7 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
             {isAgreed ? (
               <button
                 onClick={handleDraftAgreement}
-                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
               >
                 <FileCheck className="w-4 h-4" />
                 Draft Bilingual Micro-Agreement
@@ -185,23 +189,23 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
         {/* Guardrail Policy Banner */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-stone-100 text-xs">
           <div className="bg-stone-50 p-2.5 rounded-lg border border-stone-200">
-            <span className="text-stone-500 block text-[10px]">Floor (Farmer Cost Floor)</span>
+            <span className="text-stone-500 block text-[10px]">Floor (Supplier Cost Floor)</span>
             <span className="font-bold text-stone-800 text-sm">
-              KSh {session.guardrails.minPricePerKg} / kg
+              KSh {session.guardrails.minPricePerUnit} / unit
             </span>
           </div>
 
           <div className="bg-stone-50 p-2.5 rounded-lg border border-stone-200">
             <span className="text-stone-500 block text-[10px]">Ceiling (Max Allowed Band)</span>
             <span className="font-bold text-rose-700 text-sm">
-              KSh {session.guardrails.maxPricePerKg} / kg
+              KSh {session.guardrails.maxPricePerUnit} / unit
             </span>
           </div>
 
           <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
             <span className="text-emerald-700 block text-[10px]">Current Coordinator Counter</span>
             <span className="font-bold text-emerald-900 text-sm">
-              KSh {session.agreedPricePerKg || session.currentCounterPricePerKg} / kg
+              KSh {session.agreedPricePerUnit || session.currentCounterPricePerUnit} / unit
             </span>
           </div>
 
@@ -214,27 +218,27 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
         </div>
       </div>
 
-      {/* Human-in-the-Loop Ops Escalation Card (Triggered on Guardrail Violation) */}
+      {/* Human-in-the-Loop Ops Escalation Card */}
       {isEscalated && (
         <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-5 shadow-sm space-y-3">
           <div className="flex items-start gap-3">
             <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
             <div className="flex-1">
               <h3 className="text-sm font-bold text-rose-950">
-                ⚠️ Platform Guardrail Breach: Human-in-the-Loop Approval Required
+                ⚠️ Platform Guardrail Breach: Human Buyer-Rep Review Required
               </h3>
               <p className="text-xs text-rose-800 mt-1">
                 {session.escalationReason}
               </p>
               <div className="text-[11px] text-rose-700 mt-0.5">
-                Per non-negotiable platform policy: The AI agent is prohibited from committing vendor mobile funds to farm-gate prices above configured ceilings without human buyer-rep authorization.
+                Per Soko Smart non-negotiable policy: The AI agent is prohibited from committing small business funds above configured maximum ceilings without human authorization.
               </div>
             </div>
           </div>
 
-          <div className="bg-white/80 rounded-lg p-3 border border-rose-200 grid grid-cols-1 md:grid-cols-12 gap-3 items-center text-xs">
+          <div className="bg-white/90 rounded-lg p-3 border border-rose-200 grid grid-cols-1 md:grid-cols-12 gap-3 items-center text-xs">
             <div className="md:col-span-3">
-              <label className="block text-stone-600 font-medium mb-1">Approved Price / kg:</label>
+              <label className="block text-stone-600 font-medium mb-1">Approved Price / unit:</label>
               <input
                 type="number"
                 value={overridePrice}
@@ -271,9 +275,9 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
         </div>
       )}
 
-      {/* Main Negotiation Split View: Transcript + Simulation Controls */}
+      {/* Main Split: Transcript + Supplier Simulation */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left: Complete Immutable Transcript */}
+        {/* Left: Complete Immutable Audit Transcript */}
         <div className="lg:col-span-8 bg-white rounded-xl border border-stone-200 p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-stone-100">
             <span className="text-xs font-semibold uppercase tracking-wider text-stone-600">
@@ -288,7 +292,6 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
             {session.transcript.map(msg => {
               const isAgent = msg.sender === 'agent';
               const isHuman = msg.sender === 'human_ops';
-              const isCoop = msg.sender === 'cooperative';
 
               return (
                 <div
@@ -308,7 +311,7 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
                       ) : isAgent ? (
                         <span className="text-emerald-800">🤖 {msg.senderName}</span>
                       ) : (
-                        <span className="text-stone-700">🚜 {msg.senderName}</span>
+                        <span className="text-stone-700">🏢 {msg.senderName}</span>
                       )}
                     </span>
                     <span className="text-[10px] text-stone-400">
@@ -320,14 +323,14 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
                     {msg.message}
                   </p>
 
-                  {msg.priceOfferPerKg && (
+                  {msg.priceOfferPerUnit && (
                     <div className="mt-2 pt-2 border-t border-stone-200/60 flex items-center gap-2 text-[11px]">
                       <span className="font-semibold">Offer Price:</span>
                       <span className="font-mono bg-white px-2 py-0.5 rounded border border-stone-300 font-bold">
-                        KSh {msg.priceOfferPerKg} / kg
+                        KSh {msg.priceOfferPerUnit} / unit
                       </span>
                       <span className="text-stone-500">
-                        (~KSh {(msg.priceOfferPerKg * session.totalKg).toLocaleString()} total batch)
+                        (~KSh {(msg.priceOfferPerUnit * session.totalUnits).toLocaleString()} total batch)
                       </span>
                     </div>
                   )}
@@ -337,23 +340,23 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
           </div>
         </div>
 
-        {/* Right: Interactive Co-op Response Tester & Guardrail Simulation Deck */}
+        {/* Right: Supplier Simulation Controls */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
             <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700 mb-2">
-              Cooperative Simulation Deck
+              Supplier Simulation Deck
             </h3>
             <p className="text-xs text-stone-500 mb-3">
-              Test how the Soko Smart agent reacts to different price asks from farm cooperatives:
+              Test how Soko Smart reacts to wholesale factory bids:
             </p>
 
             {/* Test Scenario Buttons */}
             <div className="space-y-2 text-xs">
               <button
                 onClick={() =>
-                  handleSendCoopReply(
-                    21,
-                    'Tumekubaliana! Tunaweza kufikisha kilo 350 za sukuma wiki safi kabla ya 06:30 AM Hamza Market kwa KSh 21/kg.'
+                  handleSendSupplierReply(
+                    session.guardrails.minPricePerUnit + 10,
+                    'Tumekubaliana! Tunaweza kuleta mzigo wote wa jumla kesho asubuhi Hamza Staging Hub kwa bei hii.'
                   )
                 }
                 disabled={loading}
@@ -361,18 +364,18 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-bold text-emerald-900 block">Scenario A: Co-op Accepts (KSh 21/kg)</span>
+                  <span className="font-bold text-emerald-900 block">Scenario A: Accept Within Guardrail</span>
                   <span className="text-emerald-700 text-[11px]">
-                    Within guardrail → Agent immediately agrees and moves to draft contract.
+                    Price within band → Agent immediately concludes deal and drafts micro-agreement.
                   </span>
                 </div>
               </button>
 
               <button
                 onClick={() =>
-                  handleSendCoopReply(
-                    32,
-                    'Kutokana na uhaba wa mafuta na mvua Limuru, bei yetu ya chini ni KSh 32 kwa kilo, hatuwezi kwenda chini ya hapo.'
+                  handleSendSupplierReply(
+                    session.guardrails.maxPricePerUnit + 40,
+                    'Kutokana na upungufu wa bidhaa ghafi na mafuta, bei yetu ya chini kabisa iko juu ya kiwango chenu.'
                   )
                 }
                 disabled={loading}
@@ -380,46 +383,44 @@ export const NegotiationRoom: React.FC<NegotiationRoomProps> = ({
               >
                 <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-bold text-rose-900 block">Scenario B: Guardrail Violation (KSh 32/kg)</span>
+                  <span className="font-bold text-rose-900 block">Scenario B: Guardrail Violation</span>
                   <span className="text-rose-700 text-[11px]">
-                    Exceeds KSh 28 ceiling → Agent halts and triggers Human-in-the-Loop review!
+                    Exceeds ceiling → Agent pauses and alerts Human Buyer-Rep!
                   </span>
                 </div>
               </button>
             </div>
 
-            {/* Custom Price Slider / Reply */}
+            {/* Custom Price & Reply */}
             <div className="mt-4 pt-4 border-t border-stone-100 text-xs">
               <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-stone-700">Custom Co-op Counter Ask:</span>
+                <span className="font-semibold text-stone-700">Custom Supplier Counter Ask:</span>
                 <span className="font-mono font-bold text-emerald-800 text-sm">
-                  KSh {simulatedCoopPrice} / kg
+                  KSh {simulatedSupplierPrice}
                 </span>
               </div>
               <input
-                type="range"
-                min={15}
-                max={38}
-                value={simulatedCoopPrice}
-                onChange={e => setSimulatedCoopPrice(Number(e.target.value))}
-                className="w-full accent-emerald-700"
+                type="number"
+                value={simulatedSupplierPrice}
+                onChange={e => setSimulatedSupplierPrice(Number(e.target.value))}
+                className="w-full bg-stone-50 border border-stone-300 rounded p-2 text-stone-900 font-mono font-bold"
               />
 
               <textarea
                 rows={2}
-                value={simulatedCoopMessage}
-                onChange={e => setSimulatedCoopMessage(e.target.value)}
-                placeholder="Optional custom Swahili/English message from cooperative..."
+                value={simulatedSupplierMessage}
+                onChange={e => setSimulatedSupplierMessage(e.target.value)}
+                placeholder="Optional Swahili/English message from wholesale supplier..."
                 className="w-full mt-2 bg-stone-50 border border-stone-300 rounded p-2 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
 
               <button
-                onClick={() => handleSendCoopReply()}
+                onClick={() => handleSendSupplierReply()}
                 disabled={loading}
                 className="w-full mt-2 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
-                Dispatch Co-op Counter
+                Dispatch Supplier Offer
               </button>
             </div>
           </div>

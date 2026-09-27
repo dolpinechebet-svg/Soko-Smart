@@ -9,21 +9,26 @@ import {
   QrCode,
   Download,
   Send,
-  Languages
+  Languages,
+  Hammer,
+  Sparkles,
+  Scissors,
+  Apple,
+  Utensils
 } from 'lucide-react';
-import { MicroAgreement, MamaMbogaVendor } from '../types';
+import { MicroAgreement, BusinessOwner, BusinessTradeCategory } from '../types';
 
 interface MicroAgreementsViewProps {
   agreements: MicroAgreement[];
-  vendors: MamaMbogaVendor[];
-  onConfirmVendorAgreement: (agreementId: string, vendorId: string) => void;
+  businesses: BusinessOwner[];
+  onConfirmBusinessAgreement: (agreementId: string, businessId: string) => void;
   onNavigateToMpesa: () => void;
 }
 
 export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
   agreements,
-  vendors,
-  onConfirmVendorAgreement,
+  businesses,
+  onConfirmBusinessAgreement,
   onNavigateToMpesa
 }) => {
   const [selectedAgreementId, setSelectedAgreementId] = useState<string>(
@@ -37,12 +42,12 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
     return (
       <div className="bg-white rounded-xl border border-stone-200 p-8 text-center text-stone-500">
         <FileText className="w-8 h-8 text-stone-300 mx-auto mb-2" />
-        <p className="text-sm font-medium">Bado hakuna mikataba iliyotengenezwa.</p>
+        <p className="text-sm font-medium">Bado hakuna mikataba ya kielektroniki iliyotengenezwa.</p>
       </div>
     );
   }
 
-  const allVendorsConfirmed = Object.values(agreement.vendorConfirmations).every(v => v.confirmed);
+  const allBusinessesConfirmed = Object.values(agreement.businessConfirmations).every(v => v.confirmed);
 
   return (
     <div className="space-y-6">
@@ -51,17 +56,17 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
-                Digital Micro-Agreements Desk
+              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                Digital Micro-Purchase Agreements Desk
               </span>
               <span className="text-stone-300">·</span>
               <span className="text-xs text-stone-500 font-mono">{agreement.contractNumber}</span>
             </div>
             <h2 className="text-xl font-bold text-stone-900 tracking-tight">
-              Bilingual Farm-to-Vendor Micro-Contract
+              Bilingual Trade Micro-Contract Generator
             </h2>
             <p className="text-xs text-stone-600 mt-1 max-w-2xl">
-              Plain-language digital delivery agreements legally binding farm cooperatives and Mama Mboga clusters. Confirmed via single-word WhatsApp reply ("NDIYO" / "YES").
+              Plain-language digital purchase records binding wholesalers and small business merchant pools. Confirmed via single-word WhatsApp reply ("NDIYO" / "YES").
             </p>
           </div>
 
@@ -104,7 +109,7 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
           </div>
         </div>
 
-        {/* Agreement Switcher if multiple */}
+        {/* Agreement Selector Tabs */}
         {agreements.length > 1 && (
           <div className="flex items-center gap-2 mt-4 pt-3 border-t border-stone-100 overflow-x-auto text-xs">
             <span className="text-stone-400 font-medium">Select Agreement:</span>
@@ -118,7 +123,7 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                 }`}
               >
-                {a.contractNumber} ({a.produceName})
+                {a.contractNumber} ({a.productName})
               </button>
             ))}
           </div>
@@ -128,12 +133,11 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Agreement Document Preview */}
         <div className="lg:col-span-8 bg-white rounded-xl border border-stone-200 p-6 shadow-xs space-y-6">
-          {/* Official Document Header */}
           <div className="border-b-2 border-stone-900 pb-4 flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  SOKO SMART REPO: {agreement.contractNumber}
+                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase">
+                  SOKO SMART REF: {agreement.contractNumber}
                 </span>
                 <span className="text-xs text-stone-400">·</span>
                 <span className="text-xs text-stone-500 font-mono">
@@ -141,10 +145,10 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
                 </span>
               </div>
               <h1 className="text-lg font-black text-stone-950 mt-1 uppercase tracking-tight">
-                Micro-Delivery Produce Sourcing Agreement
+                Micro-Purchase Sourcing Agreement · {agreement.category.toUpperCase()}
               </h1>
               <p className="text-xs text-stone-500">
-                Makadara Informal Produce Vendors Pool ↔ {agreement.cooperativeName}
+                Makadara Small Business Merchant Pool ↔ {agreement.supplierName}
               </p>
             </div>
 
@@ -157,16 +161,16 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
           {/* Key Parameters Table */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-50 p-4 rounded-xl border border-stone-200 text-xs">
             <div>
-              <span className="text-stone-500 block text-[10px]">Produce & Quality Grade</span>
-              <span className="font-bold text-stone-900 block">{agreement.produceName}</span>
+              <span className="text-stone-500 block text-[10px]">Product / Material</span>
+              <span className="font-bold text-stone-900 block truncate">{agreement.productName}</span>
             </div>
             <div>
-              <span className="text-stone-500 block text-[10px]">Total Pooled Volume</span>
-              <span className="font-bold text-stone-900 block">{agreement.totalQuantityKg.toLocaleString()} kg</span>
+              <span className="text-stone-500 block text-[10px]">Aggregated Volume</span>
+              <span className="font-bold text-stone-900 block">{agreement.totalQuantityBase.toLocaleString()} units</span>
             </div>
             <div>
-              <span className="text-stone-500 block text-[10px]">Agreed Farm-gate Rate</span>
-              <span className="font-bold text-emerald-800 block font-mono">KSh {agreement.pricePerKgKsh} / kg</span>
+              <span className="text-stone-500 block text-[10px]">Agreed Factory Rate</span>
+              <span className="font-bold text-emerald-800 block font-mono">KSh {agreement.pricePerUnitKsh}</span>
             </div>
             <div>
               <span className="text-stone-500 block text-[10px]">Total Consideration</span>
@@ -174,11 +178,11 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
             </div>
           </div>
 
-          {/* Agreement Body Text (Swahili, English or Bilingual) */}
+          {/* Agreement Body Text */}
           <div className="space-y-4 text-xs leading-relaxed text-stone-800">
             {(languageMode === 'swahili' || languageMode === 'bilingual') && (
               <div className="p-4 bg-emerald-50/30 rounded-lg border border-emerald-100 font-sans">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 block mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-950 block mb-2">
                   🇰🇪 Nakala ya Kiswahili (Swahili Digital Record)
                 </span>
                 <pre className="font-sans whitespace-pre-line text-xs text-stone-800">
@@ -199,31 +203,30 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
             )}
           </div>
 
-          {/* Compliance & Regulatory Notice */}
+          {/* Legal Transparency & Compliance Notice */}
           <div className="bg-amber-50/70 border border-amber-200 p-3 rounded-lg text-[11px] text-amber-900 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">Compliance & Legal Transparency Notice:</span>
-              This micro-agreement serves as a lightweight digital ledger record for mutual trust and accountability between informal vendors and registered farm cooperatives. Funds are secured via Safaricom Daraja M-PESA escrow suspension prior to dispatch.
+              This micro-agreement serves as a lightweight digital ledger record for mutual trust and accountability between informal traders and registered wholesale suppliers. Funds are secured via Safaricom Daraja M-PESA escrow suspension prior to dispatch.
             </div>
           </div>
         </div>
 
-        {/* Right Column: One-Tap Confirmation Status & Signoff Desk */}
+        {/* Right Column: One-Word Confirmation Status */}
         <div className="lg:col-span-4 space-y-4">
-          {/* Parties Confirmation Tracker */}
           <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
             <h3 className="text-xs font-bold uppercase tracking-wider text-stone-800 mb-3">
               One-Word Confirmation Status ("NDIYO" / "YES")
             </h3>
 
-            {/* Farm Cooperative Signoff */}
+            {/* Supplier Signoff */}
             <div className="p-3 rounded-lg border border-stone-200 mb-3 bg-stone-50/50">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-stone-900">
-                  🚜 {agreement.cooperativeName}
+                <span className="text-xs font-bold text-stone-900 truncate">
+                  🏢 {agreement.supplierName}
                 </span>
-                {agreement.coopConfirmed ? (
+                {agreement.supplierConfirmed ? (
                   <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                     Confirmed
@@ -236,31 +239,31 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
                 )}
               </div>
               <span className="text-[11px] text-stone-500 block mt-0.5 font-mono">
-                {agreement.cooperativePhone}
+                {agreement.supplierPhone}
               </span>
             </div>
 
-            {/* Pooled Mama Mbogas Signoff Checklists */}
+            {/* Pooled Business Owners Checklist */}
             <div className="space-y-2">
               <span className="text-xs font-semibold text-stone-700 block">
-                Mama Mboga Cluster Members:
+                Pooled Business Merchants:
               </span>
 
-              {Object.entries(agreement.vendorConfirmations).map(([vId, conf]) => {
-                const matchedVendor = vendors.find(v => v.id === vId);
+              {Object.entries(agreement.businessConfirmations).map(([bId, conf]) => {
+                const matchedBiz = businesses.find(b => b.id === bId);
                 const isConfirmed = conf.confirmed;
 
                 return (
                   <div
-                    key={vId}
+                    key={bId}
                     className="p-2.5 rounded-lg border border-stone-200 flex items-center justify-between text-xs"
                   >
                     <div>
                       <span className="font-semibold text-stone-800 block">
-                        {matchedVendor?.name || vId}
+                        {matchedBiz?.businessName || bId}
                       </span>
                       <span className="text-[11px] text-stone-500 font-mono">
-                        {matchedVendor?.phone}
+                        {matchedBiz?.phone}
                       </span>
                     </div>
 
@@ -271,7 +274,7 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
                       </span>
                     ) : (
                       <button
-                        onClick={() => onConfirmVendorAgreement(agreement.id, vId)}
+                        onClick={() => onConfirmBusinessAgreement(agreement.id, bId)}
                         className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[11px] font-semibold transition-colors flex items-center gap-1 shadow-2xs"
                       >
                         <Send className="w-3 h-3" />
@@ -283,7 +286,7 @@ export const MicroAgreementsView: React.FC<MicroAgreementsViewProps> = ({
               })}
             </div>
 
-            {/* Action to Proceed to M-PESA STK Escrow Settlement */}
+            {/* Proceed to Escrow Ledger */}
             <div className="mt-4 pt-3 border-t border-stone-100">
               <button
                 onClick={onNavigateToMpesa}

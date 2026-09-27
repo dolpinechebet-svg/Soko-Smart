@@ -12,13 +12,13 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { LedgerEntry, MpesaTransaction, CooperativeSupplier } from '../types';
+import { LedgerEntry, MpesaTransaction, WholesaleSupplier } from '../types';
 
 interface MpesaLedgerViewProps {
-  cooperatives: CooperativeSupplier[];
+  suppliers: WholesaleSupplier[];
 }
 
-export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }) => {
+export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ suppliers }) => {
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [transactions, setTransactions] = useState<MpesaTransaction[]>([]);
   const [summary, setSummary] = useState({
@@ -31,16 +31,16 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
 
   // STK Push Manual Test Form
   const [stkForm, setStkForm] = useState({
-    phone: '254712345678',
-    amount: 3510,
-    vendorName: 'Mama Sarah Wanjiku'
+    phone: '254712998877',
+    amount: 6600,
+    businessName: 'Kamau Hardwares Depot'
   });
   const [stkFeedback, setStkFeedback] = useState<string | null>(null);
 
-  // Cooperative Payout Form
+  // Supplier Payout Form
   const [payoutForm, setPayoutForm] = useState({
-    coopId: cooperatives[0]?.id || '',
-    amount: 11700
+    supplierId: suppliers[0]?.id || '',
+    amount: 11550
   });
 
   useEffect(() => {
@@ -79,14 +79,14 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
         body: JSON.stringify({
           phone: stkForm.phone,
           amountKsh: stkForm.amount,
-          vendorName: stkForm.vendorName,
-          purpose: 'vendor_pool_collection'
+          businessName: stkForm.businessName,
+          purpose: 'trader_pool_collection'
         })
       });
 
       if (res.ok) {
         const data = await res.json();
-        setStkFeedback(`✅ STK Push imetumwa! CheckoutID: ${data.checkoutRequestId}. Unaweza kuthibitisha PIN kwenye WhatsApp simulator.`);
+        setStkFeedback(`✅ STK Push imetumwa! CheckoutID: ${data.checkoutRequestId}. Unaweza kuthibitisha PIN kwenye simu ya WhatsApp.`);
         fetchLedger();
       }
     } catch (err) {
@@ -96,13 +96,13 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
 
   const handleReleasePayout = async () => {
     try {
-      const res = await fetch('/api/ledger/payout-coop', {
+      const res = await fetch('/api/ledger/payout-supplier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cooperativeId: payoutForm.coopId,
+          supplierId: payoutForm.supplierId,
           amountKsh: payoutForm.amount,
-          agreementId: 'SS-MKD-260928-001'
+          agreementId: 'SK254-MKD-HW-260929-01'
         })
       });
 
@@ -116,22 +116,22 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
 
   return (
     <div className="space-y-6">
-      {/* Top Banner & Escrow Summary Metrics */}
+      {/* Metrics Banner */}
       <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
+              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
                 Financial Settlement & Double-Entry Ledger
               </span>
               <span className="text-stone-300">·</span>
               <span className="text-xs text-stone-500 font-mono">Safaricom Daraja API</span>
             </div>
             <h2 className="text-xl font-bold text-stone-900 tracking-tight">
-              M-PESA Escrow Suspense & Cooperative Payouts
+              M-PESA Escrow Suspense & Supplier B2B Disbursements
             </h2>
             <p className="text-xs text-stone-600 mt-1 max-w-2xl">
-              Strict isolation of funds: Mama Mboga contributions are held in trusted escrow accounts and reconciled via double-entry bookkeeping prior to releasing B2B payouts to farm co-operatives.
+              Strict isolation of funds: Small business pooled deposits are held in trusted escrow accounts and reconciled via double-entry bookkeeping prior to releasing B2B payouts to wholesale distributors.
             </p>
           </div>
 
@@ -140,14 +140,14 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
             className="p-2 border border-stone-200 rounded-lg hover:bg-stone-50 text-stone-600 flex items-center gap-1.5 text-xs font-medium"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Reconcile
+            Reconcile Ledger
           </button>
         </div>
 
         {/* Financial Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-5 pt-4 border-t border-stone-100">
           <div className="bg-stone-50 p-4 rounded-xl border border-stone-200">
-            <span className="text-stone-500 text-xs block mb-1">Total Collections (In)</span>
+            <span className="text-stone-500 text-xs block mb-1">Total Trader Collections (In)</span>
             <div className="flex items-baseline gap-1">
               <span className="text-xs text-stone-400 font-bold">KSh</span>
               <span className="text-xl font-bold text-stone-900 font-mono">
@@ -160,8 +160,8 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
             </span>
           </div>
 
-          <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200">
-            <span className="text-emerald-800 text-xs font-semibold block mb-1">Active Escrow Balance</span>
+          <div className="bg-emerald-50/70 p-4 rounded-xl border border-emerald-200">
+            <span className="text-emerald-800 text-xs font-semibold block mb-1">Active Soko Smart Escrow Balance</span>
             <div className="flex items-baseline gap-1">
               <span className="text-xs text-emerald-600 font-bold">KSh</span>
               <span className="text-xl font-bold text-emerald-950 font-mono">
@@ -175,7 +175,7 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
           </div>
 
           <div className="bg-stone-50 p-4 rounded-xl border border-stone-200">
-            <span className="text-stone-500 text-xs block mb-1">Cooperative Payouts (Out)</span>
+            <span className="text-stone-500 text-xs block mb-1">Supplier Payouts (Out)</span>
             <div className="flex items-baseline gap-1">
               <span className="text-xs text-stone-400 font-bold">KSh</span>
               <span className="text-xl font-bold text-stone-900 font-mono">
@@ -197,14 +197,14 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
               </span>
             </div>
             <span className="text-[11px] text-stone-500 flex items-center gap-1 mt-1">
-              Revenue allocation
+              Coordination fee revenue
             </span>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Double-Entry Immutable Ledger Table */}
+        {/* Left Column: Double-Entry Immutable Ledger */}
         <div className="lg:col-span-8 bg-white rounded-xl border border-stone-200 p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-stone-100">
             <span className="text-xs font-semibold uppercase tracking-wider text-stone-700">
@@ -257,7 +257,7 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
           </div>
         </div>
 
-        {/* Right Column: Daraja STK Trigger & Co-op Disbursement Controls */}
+        {/* Right Column: Direct STK Dispatcher & Supplier Disbursement */}
         <div className="lg:col-span-4 space-y-4">
           {/* Daraja Sandbox STK Push Tester */}
           <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
@@ -266,7 +266,7 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
               Direct STK Push Dispatcher
             </h3>
             <p className="text-xs text-stone-500 mb-3">
-              Trigger Daraja Lipa na M-PESA Online STK Push directly to a vendor:
+              Trigger Daraja Lipa na M-PESA Online STK Push directly to a trader:
             </p>
 
             <form onSubmit={handleTriggerStkPush} className="space-y-3 text-xs">
@@ -306,27 +306,27 @@ export const MpesaLedgerView: React.FC<MpesaLedgerViewProps> = ({ cooperatives }
             )}
           </div>
 
-          {/* Release Co-op Payout Card */}
+          {/* Release Supplier Payout Card */}
           <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-xs">
             <h3 className="text-xs font-bold uppercase tracking-wider text-stone-800 mb-2 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-stone-700" />
-              Disburse Co-op Payout (Daraja B2B)
+              Disburse Supplier Payout (Daraja B2B)
             </h3>
             <p className="text-xs text-stone-500 mb-3">
-              Release remaining 50% from escrow suspense once delivery inspection at Hamza Dropoff is verified:
+              Release remaining 50% from escrow suspense once offload inspection at Hamza Hub is signed off:
             </p>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-stone-600 font-medium mb-1">Cooperative:</label>
+                <label className="block text-stone-600 font-medium mb-1">Wholesale Supplier:</label>
                 <select
-                  value={payoutForm.coopId}
-                  onChange={e => setPayoutForm({ ...payoutForm, coopId: e.target.value })}
+                  value={payoutForm.supplierId}
+                  onChange={e => setPayoutForm({ ...payoutForm, supplierId: e.target.value })}
                   className="w-full bg-stone-50 border border-stone-300 rounded px-3 py-2 text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
-                  {cooperatives.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} (Paybill: {c.mpesaPaybill})
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>
+                      [{s.category}] {s.name} (Paybill: {s.mpesaPaybill})
                     </option>
                   ))}
                 </select>

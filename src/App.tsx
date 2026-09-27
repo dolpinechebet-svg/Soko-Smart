@@ -8,34 +8,37 @@ import { MpesaLedgerView } from './components/MpesaLedgerView';
 import { DisputeDesk } from './components/DisputeDesk';
 import { ConfigOntology } from './components/ConfigOntology';
 import {
-  MamaMbogaVendor,
-  ProduceItem,
+  BusinessOwner,
+  ProductItem,
   DemandCluster,
   DemandOrder,
   MicroAgreement,
-  CooperativeSupplier,
-  DisputeTicket
+  WholesaleSupplier,
+  DisputeTicket,
+  BusinessTradeCategory
 } from './types';
 import {
-  INITIAL_VENDORS,
-  INITIAL_PRODUCE_CATALOG,
+  INITIAL_BUSINESS_OWNERS,
+  INITIAL_PRODUCT_CATALOG,
   INITIAL_CLUSTERS,
   INITIAL_ORDERS,
   INITIAL_AGREEMENTS,
-  INITIAL_COOPERATIVES,
-  INITIAL_DISPUTES
+  INITIAL_SUPPLIERS,
+  INITIAL_DISPUTES,
+  TRADE_CATEGORIES
 } from './data/seedData';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('whatsapp');
-  const [vendors, setVendors] = useState<MamaMbogaVendor[]>(INITIAL_VENDORS);
-  const [selectedVendor, setSelectedVendor] = useState<MamaMbogaVendor>(INITIAL_VENDORS[0]);
-  const [catalog, setCatalog] = useState<ProduceItem[]>(INITIAL_PRODUCE_CATALOG);
+  const [businesses, setBusinesses] = useState<BusinessOwner[]>(INITIAL_BUSINESS_OWNERS);
+  const [selectedBusiness, setSelectedBusiness] = useState<BusinessOwner>(INITIAL_BUSINESS_OWNERS[0]);
+  const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCT_CATALOG);
   const [clusters, setClusters] = useState<DemandCluster[]>(INITIAL_CLUSTERS);
   const [orders, setOrders] = useState<DemandOrder[]>(INITIAL_ORDERS);
   const [agreements, setAgreements] = useState<MicroAgreement[]>(INITIAL_AGREEMENTS);
-  const [cooperatives, setCooperatives] = useState<CooperativeSupplier[]>(INITIAL_COOPERATIVES);
+  const [suppliers, setSuppliers] = useState<WholesaleSupplier[]>(INITIAL_SUPPLIERS);
   const [disputes, setDisputes] = useState<DisputeTicket[]>(INITIAL_DISPUTES);
+  const [selectedTrade, setSelectedTrade] = useState<BusinessTradeCategory | 'all'>('all');
   const [activeNegotiationClusterId, setActiveNegotiationClusterId] = useState<string>(
     INITIAL_CLUSTERS[0]?.id || ''
   );
@@ -70,22 +73,22 @@ export default function App() {
 
       if (demandRes.ok) {
         const data = await demandRes.json();
-        setClusters(data.clusters || INITIAL_CLUSTERS);
-        setOrders(data.orders || INITIAL_ORDERS);
-        setCooperatives(data.cooperatives || INITIAL_COOPERATIVES);
-        setVendors(data.vendors || INITIAL_VENDORS);
+        if (data.clusters) setClusters(data.clusters);
+        if (data.orders) setOrders(data.orders);
+        if (data.suppliers) setSuppliers(data.suppliers);
+        if (data.businesses) setBusinesses(data.businesses);
       }
       if (agreementsRes.ok) {
         const data = await agreementsRes.json();
-        setAgreements(data || INITIAL_AGREEMENTS);
+        if (Array.isArray(data)) setAgreements(data);
       }
       if (disputesRes.ok) {
         const data = await disputesRes.json();
-        setDisputes(data || INITIAL_DISPUTES);
+        if (Array.isArray(data)) setDisputes(data);
       }
       if (ontologyRes.ok) {
         const data = await ontologyRes.json();
-        setCatalog(data || INITIAL_PRODUCE_CATALOG);
+        if (Array.isArray(data)) setProducts(data);
       }
     } catch (err) {
       console.warn('Initial data load warning:', err);
@@ -98,7 +101,7 @@ export default function App() {
         method: 'POST'
       });
       if (res.ok) {
-        refreshAllData();
+        await refreshAllData();
         setActiveNegotiationClusterId(clusterId);
         setActiveTab('negotiation');
       }
@@ -107,15 +110,15 @@ export default function App() {
     }
   };
 
-  const handleConfirmVendorAgreement = async (agreementId: string, vendorId: string) => {
+  const handleConfirmBusinessAgreement = async (agreementId: string, businessId: string) => {
     try {
       const res = await fetch(`/api/agreements/${agreementId}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendorId })
+        body: JSON.stringify({ businessId })
       });
       if (res.ok) {
-        refreshAllData();
+        await refreshAllData();
       }
     } catch (err) {
       console.error('Confirm agreement error:', err);
@@ -130,6 +133,15 @@ export default function App() {
     d => d.status === 'open' || d.status === 'investigating'
   ).length;
 
+  // Filter clusters & orders if trade is selected (or show all)
+  const filteredClusters = selectedTrade === 'all'
+    ? clusters
+    : clusters.filter(c => c.category === selectedTrade);
+
+  const filteredOrders = selectedTrade === 'all'
+    ? orders
+    : orders.filter(o => o.category === selectedTrade);
+
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-stone-900 font-sans flex flex-col">
       {/* Top Application Header */}
@@ -139,15 +151,17 @@ export default function App() {
         geminiConnected={geminiConnected}
         unresolvedDisputesCount={openDisputesCount}
         pendingAgreementsCount={pendingAgreementsCount}
+        selectedTradeFilter={selectedTrade}
+        setSelectedTradeFilter={val => setSelectedTrade(val as BusinessTradeCategory | 'all')}
       />
 
       {/* Main Workspace Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'whatsapp' && (
           <WhatsAppSimulator
-            vendors={vendors}
-            selectedVendor={selectedVendor}
-            setSelectedVendor={setSelectedVendor}
+            businesses={businesses}
+            selectedBusiness={selectedBusiness}
+            setSelectedBusiness={setSelectedBusiness}
             onOrderCreated={refreshAllData}
             onAgreementConfirmed={refreshAllData}
             onOpenAgreementsTab={() => setActiveTab('agreements')}
@@ -156,10 +170,11 @@ export default function App() {
 
         {activeTab === 'clustering' && (
           <DemandClustering
-            clusters={clusters}
-            orders={orders}
-            catalog={catalog}
-            vendors={vendors}
+            clusters={filteredClusters}
+            orders={filteredOrders}
+            products={products}
+            businesses={businesses}
+            tradeCategories={TRADE_CATEGORIES}
             onLockCluster={handleLockCluster}
             onOrderAdded={refreshAllData}
             onNavigateToNegotiation={cId => {
@@ -181,22 +196,26 @@ export default function App() {
         {activeTab === 'agreements' && (
           <MicroAgreementsView
             agreements={agreements}
-            vendors={vendors}
-            onConfirmVendorAgreement={handleConfirmVendorAgreement}
+            businesses={businesses}
+            onConfirmBusinessAgreement={handleConfirmBusinessAgreement}
             onNavigateToMpesa={() => setActiveTab('mpesa')}
           />
         )}
 
         {activeTab === 'mpesa' && (
-          <MpesaLedgerView cooperatives={cooperatives} />
+          <MpesaLedgerView suppliers={suppliers} />
         )}
 
         {activeTab === 'disputes' && (
-          <DisputeDesk vendors={vendors} onDisputeResolved={refreshAllData} />
+          <DisputeDesk businesses={businesses} onDisputeResolved={refreshAllData} />
         )}
 
         {activeTab === 'ontology' && (
-          <ConfigOntology catalog={catalog} onUpdateCatalog={setCatalog} />
+          <ConfigOntology
+            products={products}
+            tradeCategories={TRADE_CATEGORIES}
+            onUpdateProducts={setProducts}
+          />
         )}
       </main>
 
@@ -204,10 +223,10 @@ export default function App() {
       <footer className="bg-stone-100 border-t border-stone-200 py-4 px-6 text-center text-xs text-stone-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
-            Soko Smart Engine · Makadara Produce Aggregation Network (Hamza, Maringo, Viwandani, Harambee)
+            Soko Smart Engine · Nairobi & Regional Cluster Hubs (Gikomba, Eastleigh, Makadara, Industrial Area, Kangemi, River Road)
           </span>
           <span className="font-mono text-stone-400">
-            M-PESA Daraja Integration · WhatsApp Cloud API · Swahili & Sheng NLU
+            Safaricom Daraja B2B/C2B · Meta Cloud WhatsApp API · Swahili, Sheng & English Multilingual NLU
           </span>
         </div>
       </footer>

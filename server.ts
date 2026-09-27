@@ -4,16 +4,20 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import {
-  INITIAL_PRODUCE_CATALOG,
-  INITIAL_VENDORS,
-  INITIAL_COOPERATIVES,
+  INITIAL_PRODUCT_CATALOG,
+  INITIAL_BUSINESS_OWNERS,
+  INITIAL_SUPPLIERS,
   INITIAL_ORDERS,
   INITIAL_CLUSTERS,
   INITIAL_AGREEMENTS,
   INITIAL_LEDGER,
-  INITIAL_DISPUTES
+  INITIAL_DISPUTES,
+  TRADE_CATEGORIES
 } from './src/data/seedData';
 import {
+  ProductItem,
+  BusinessOwner,
+  WholesaleSupplier,
   DemandOrder,
   DemandCluster,
   MicroAgreement,
@@ -21,7 +25,8 @@ import {
   DisputeTicket,
   NluParseResult,
   NegotiationSession,
-  MpesaTransaction
+  MpesaTransaction,
+  BusinessTradeCategory
 } from './src/types';
 
 dotenv.config();
@@ -35,9 +40,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // In-Memory operational database
-let produceCatalog = [...INITIAL_PRODUCE_CATALOG];
-let vendors = [...INITIAL_VENDORS];
-let cooperatives = [...INITIAL_COOPERATIVES];
+let products: ProductItem[] = [...INITIAL_PRODUCT_CATALOG];
+let businesses: BusinessOwner[] = [...INITIAL_BUSINESS_OWNERS];
+let suppliers: WholesaleSupplier[] = [...INITIAL_SUPPLIERS];
 let orders: DemandOrder[] = [...INITIAL_ORDERS];
 let clusters: DemandCluster[] = [...INITIAL_CLUSTERS];
 let agreements: MicroAgreement[] = [...INITIAL_AGREEMENTS];
@@ -45,120 +50,157 @@ let ledger: LedgerEntry[] = [...INITIAL_LEDGER];
 let disputes: DisputeTicket[] = [...INITIAL_DISPUTES];
 let mpesaTransactions: MpesaTransaction[] = [
   {
-    id: 'tx-001',
-    checkoutRequestId: 'ws_CO_27092026_01',
-    merchantRequestId: 'MR-9921',
-    vendorId: 'vendor-sarah',
-    vendorName: 'Mama Sarah Wanjiku',
-    vendorPhone: '+254712345678',
-    amount: 3510,
-    purpose: 'vendor_pool_collection',
+    id: 'tx-hw-001',
+    checkoutRequestId: 'ws_CO_27092026_HW01',
+    merchantRequestId: 'MR-HW-9921',
+    businessId: 'biz-hardware-kamau',
+    businessName: 'Kamau Hardwares Depot',
+    phone: '254712998877',
+    amount: 6600,
+    purpose: 'trader_pool_collection',
     status: 'completed',
-    mpesaReceiptNumber: 'QKA82910XZ',
+    mpesaReceiptNumber: 'QKA82910HW',
     resultCode: 0,
     resultDesc: 'The service request is processed successfully.',
-    timestamp: '2026-09-27T08:12:15Z'
-  },
-  {
-    id: 'tx-002',
-    checkoutRequestId: 'ws_CO_27092026_02',
-    merchantRequestId: 'MR-9922',
-    vendorId: 'vendor-wambui',
-    vendorName: 'Mama Wambui Kamau',
-    vendorPhone: '+254722987654',
-    amount: 4680,
-    purpose: 'vendor_pool_collection',
-    status: 'completed',
-    mpesaReceiptNumber: 'QKB99301KL',
-    resultCode: 0,
-    resultDesc: 'The service request is processed successfully.',
-    timestamp: '2026-09-27T08:15:45Z'
+    timestamp: '2026-09-27T08:20:15Z'
   }
 ];
 
 // Active negotiation sessions
 let negotiationSessions: Record<string, NegotiationSession> = {
-  'cluster-makadara-sukuma-01': {
-    id: 'neg-sukuma-01',
-    clusterId: 'cluster-makadara-sukuma-01',
-    cooperativeId: 'coop-limuru',
-    cooperativeName: 'Limuru Greens Smallholder Alliance',
-    produceName: 'Sukuma Wiki',
-    totalKg: 350,
+  'cluster-salon-makadara-01': {
+    id: 'neg-salon-01',
+    clusterId: 'cluster-salon-makadara-01',
+    category: 'salon_beauty',
+    supplierId: 'supp-salon-darling',
+    supplierName: 'Darling Kenya Master Wholesaler',
+    productName: 'Darling Abuja / Classic Braids (Color #1 / #2)',
+    totalUnits: 48,
     status: 'in_progress',
     guardrails: {
-      minPricePerKg: 18,
-      maxPricePerKg: 28,
+      minPricePerUnit: 95,
+      maxPricePerUnit: 130,
       requiredDeliveryDate: '2026-09-28',
-      paymentSplit: '50% on agreement via STK Push, 50% upon delivery'
+      paymentSplit: '50% on agreement via STK Push, 50% upon delivery inspection'
     },
-    initialAskPricePerKg: 24,
-    currentCounterPricePerKg: 21,
+    initialAskPricePerUnit: 115,
+    currentCounterPricePerUnit: 102,
     transcript: [
       {
-        id: 'nm-1',
-        sender: 'cooperative',
-        senderName: 'Limuru Greens Dispatch',
-        message: 'Habari Soko Smart. Tunazo kilo 350 za sukuma safi ya shamba. Bei yetu ya jumla ni KSh 24 kwa kilo.',
-        priceOfferPerKg: 24,
-        timestamp: '2026-09-27T07:15:00Z'
+        id: 'nm-sl-1',
+        sender: 'supplier',
+        senderName: 'Darling Kenya Key Accounts',
+        message: 'Habari Soko Smart. Tunazo cartons za kutosha za Darling Abuja #1. Bei yetu ya kiwanda ni KSh 115 kwa bundle.',
+        priceOfferPerUnit: 115,
+        timestamp: '2026-09-27T07:20:00Z'
       },
       {
-        id: 'nm-2',
+        id: 'nm-sl-2',
         sender: 'agent',
-        senderName: 'Soko Smart AI Agent',
-        message: 'Asante sana Limuru Greens. Makadara Mama Mbogas wanachukua oda ya pamoja ya kilo 350 na malipo ya 50% escrow ya papo hapo. Kulingana na bei ya soko ya leo, tunaweza kufunga kwa KSh 21 kwa kilo.',
-        priceOfferPerKg: 21,
-        timestamp: '2026-09-27T07:18:00Z'
+        senderName: 'Soko Smart AI Coordinator',
+        message: 'Asante Darling Kenya. Wamiliki wa saluni Makadara wameunganisha agizo la pamoja la carton 1 (bundles 48) na malipo ya 50% escrow ya papo hapo. Tunaweza kufunga kwa KSh 102 kwa bundle na mshushe kesho asubuhi?',
+        priceOfferPerUnit: 102,
+        timestamp: '2026-09-27T07:25:00Z'
+      }
+    ]
+  },
+  'cluster-hardware-makadara-01': {
+    id: 'neg-hw-01',
+    clusterId: 'cluster-hardware-makadara-01',
+    category: 'hardware',
+    supplierId: 'supp-hardware-devki',
+    supplierName: 'Devki & Bamburi Regional Industrial Depot',
+    productName: 'Bamburi Nguvu Cement 32.5R (50kg)',
+    totalUnits: 35,
+    status: 'agreed',
+    guardrails: {
+      minPricePerUnit: 630,
+      maxPricePerUnit: 720,
+      requiredDeliveryDate: '2026-09-29',
+      paymentSplit: '50% STK Push deposit, 50% upon offload signoff'
+    },
+    initialAskPricePerUnit: 680,
+    currentCounterPricePerUnit: 660,
+    agreedPricePerUnit: 660,
+    transcript: [
+      {
+        id: 'nm-hw-1',
+        sender: 'supplier',
+        senderName: 'Devki Industrial Dispatch',
+        message: 'Bei ya kiwanda ya Bamburi 32.5R ni KSh 680 kwa mfuko.',
+        priceOfferPerUnit: 680,
+        timestamp: '2026-09-27T07:00:00Z'
+      },
+      {
+        id: 'nm-hw-2',
+        sender: 'agent',
+        senderName: 'Soko Smart AI Coordinator',
+        message: 'Wafanyabiashara wa Hamza wamekusanya mifuko 35 (Tani 1.75) na kutoa malipo ya escrow ya moja kwa moja. Tunaomba bei ya jumla ya KSh 660.',
+        priceOfferPerUnit: 660,
+        timestamp: '2026-09-27T07:05:00Z'
+      },
+      {
+        id: 'nm-hw-3',
+        sender: 'supplier',
+        senderName: 'Devki Industrial Dispatch',
+        message: 'Sawa, kwa sababu ya ununuzi wa pamoja na malipo salama ya M-PESA escrow, tumekubali KSh 660. Lori litaleta kabla ya 08:00 AM.',
+        priceOfferPerUnit: 660,
+        timestamp: '2026-09-27T07:10:00Z'
       }
     ]
   }
 };
 
-// Vendor conversation state sessions keyed by phone
+// Trader conversation state sessions keyed by phone
 interface ConversationSession {
   phone: string;
-  vendorId?: string;
-  vendorName?: string;
-  currentStep: 'IDLE' | 'CONFIRMING_ORDER' | 'PENDING_AGREEMENT_CONFIRMATION' | 'AWAITING_PIN' | 'REPORTING_DISPUTE';
+  businessId?: string;
+  businessName?: string;
+  ownerName?: string;
+  category?: BusinessTradeCategory;
+  currentStep: 'IDLE' | 'ONBOARDING_CATEGORY' | 'ONBOARDING_DETAILS' | 'CONFIRMING_ORDER' | 'PENDING_AGREEMENT_CONFIRMATION' | 'AWAITING_PIN' | 'REPORTING_DISPUTE';
   pendingOrderDraft?: {
-    produceId: string;
-    produceName: string;
+    productId: string;
+    productName: string;
+    category: BusinessTradeCategory;
     quantity: number;
     unit: string;
-    normalizedKg: number;
+    normalizedBaseQty: number;
     priceCeiling?: number;
+    brandPreference?: string;
     deliveryDate: string;
   };
   activeAgreementId?: string;
   history: {
-    role: 'vendor' | 'agent';
+    role: 'trader' | 'agent';
     text: string;
     timestamp: string;
     type?: string;
   }[];
 }
 
-const vendorSessions: Record<string, ConversationSession> = {};
+const traderSessions: Record<string, ConversationSession> = {};
 
 function getOrCreateSession(phone: string): ConversationSession {
-  if (!vendorSessions[phone]) {
-    const matchedVendor = vendors.find(v => v.phone === phone || v.mpesaNumber === phone.replace('+', ''));
-    vendorSessions[phone] = {
+  if (!traderSessions[phone]) {
+    const matched = businesses.find(b => b.phone === phone || b.mpesaNumber === phone.replace('+', ''));
+    traderSessions[phone] = {
       phone,
-      vendorId: matchedVendor?.id,
-      vendorName: matchedVendor?.name || 'Mama Mboga',
+      businessId: matched?.id,
+      businessName: matched?.businessName || 'Duka / Biashara',
+      ownerName: matched?.ownerName || 'Mfanyabiashara',
+      category: matched?.category,
       currentStep: 'IDLE',
       history: [
         {
           role: 'agent',
-          text: `Habari! Mimi ni Soko Smart, msaidizi wako wa ununuzi wa pamoja wa mboga na matunda hapa Makadara. Niambie nini unahitaji kesho (mfano: "Nataka magunia 2 ya nyanya na debe 1 ya viazi") kwa sauti au ujumbe mfupi.`,
+          text: `Habari! Mimi ni Soko Smart, msaidizi wako wa ununuzi wa pamoja (bulk pooling) kwa wafanyabiashara wa Kenya.\n\nTunaunganisha oda za Hardware, Saluni, Mboga, Vitambaa, na Vyakula ili ununue kwa bei ya jumla ya kiwanda.\n\nNiambie bidhaa unazohitaji leo (mfano: "Nahitaji mifuko 20 ya saruji Bamburi", au "Carton 2 za Darling braids") kwa maandishi au sauti.`,
           timestamp: new Date().toISOString()
         }
       ]
     };
   }
-  return vendorSessions[phone];
+  return traderSessions[phone];
 }
 
 // Initialize Gemini Client
@@ -166,61 +208,60 @@ const geminiApiKey = process.env.GEMINI_API_KEY;
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
 // ==========================================
-// 1. NLU PARSER (Swahili / Sheng / English)
+// 1. TRADE-AGNOSTIC MULTILINGUAL NLU PARSER
 // ==========================================
 
-async function parseVendorMessageWithAI(rawText: string): Promise<NluParseResult> {
-  const fallbackResult = fallbackNluParser(rawText);
+async function parseTraderMessageWithAI(rawText: string, currentCategory?: BusinessTradeCategory): Promise<NluParseResult> {
+  const fallbackResult = fallbackNluParser(rawText, currentCategory);
 
   if (!ai) {
     return fallbackResult;
   }
 
   try {
-    const prompt = `You are the NLU parser for "Soko Smart", an AI coordinator for informal produce vendors ("Mama Mbogas") in Nairobi, Kenya (specifically Makadara neighbourhood).
-Vendors send messages in Swahili, Sheng (Nairobi street slang), English, or code-switched combinations.
+    const prompt = `You are the NLU parser for "Soko Smart", an AI coordinator for informal and small business owners across Kenya (hardware, beauty/salons, tailoring/textiles, kibanda/food, produce/mama mboga, boda spares, dukas).
+Traders send messages in Swahili, Sheng (Nairobi street slang), English, or mixed code-switching.
 
-Canonical Produce Catalog:
-- "nyanya" / "tomatoes" -> canonicalProduceId: "prod-nyanya", name: "Tomatoes"
-- "sukuma wiki" / "sukuma" / "kales" -> canonicalProduceId: "prod-sukuma", name: "Sukuma Wiki"
-- "vitunguu" / "onions" -> canonicalProduceId: "prod-vitunguu", name: "Red Onions"
-- "viazi" / "waru" / "potatoes" -> canonicalProduceId: "prod-viazi", name: "Potatoes (Irish)"
-- "managu" / "nightshade" -> canonicalProduceId: "prod-managu", name: "Managu"
-- "kunde" / "cowpea leaves" -> canonicalProduceId: "prod-kunde", name: "Kunde"
+Active Trade Categories:
+- "hardware": cement ("saruji/simiti"), iron sheets ("mabati"), nails ("misumari"), pipes, paint
+- "salon_beauty": braids ("nywele/darling/lines"), shampoo ("shampu"), relaxer, oils, hair extensions
+- "produce_kiosk": tomatoes ("nyanya"), onions ("vitunguu"), potatoes ("viazi/waru"), greens ("sukuma wiki/managu")
+- "tailoring_textiles": fabric ("kitambaa/kanga/vitenge/ankara"), thread ("uzi wa mashine"), zippers
+- "kibanda_food": cooking oil ("mafuta ya kupikia/jerrican"), maize flour ("unga wa ugali/sembe"), sugar ("sukari")
+- "boda_parts": engine oil ("oil ya 4T"), spark plugs, brake pads, tubes ("mipira")
+- "general_duka": general household retail provisions
 
-Common Units & Conversions:
-- "gunia" / "magunia" / "sack" / "bag": Nyanya ~60kg, Sukuma ~70kg, Vitunguu ~50kg, Waru ~90kg
-- "debe" / "madebe": Nyanya ~15kg, Waru ~16kg
-- "kilo" / "kg": 1kg
-- "tenga": 75kg
-- "net": 10kg
+Identify the trader's intent:
+- 'onboarding': User greets ("Hi", "Niaje", "Hello", "Nataka kujiunga") or states their trade ("Nina salon", "Nauza hardware", "Mimi ni fundi")
+- 'place_order': User specifies items they need to buy/restock
+- 'confirm_agreement': User confirms ("NDIYO", "YES", "Sawa", "Confirm", "Thibitisha", "1", "Nimekubali")
+- 'report_dispute': User flags issue ("TATIZO", damaged, broken, bent, counterfeit, spoiled, missing)
+- 'check_price': User asks for current wholesale factory price or market benchmark
+- 'cancel_order': User cancels an order
+- 'help': User asks how Soko Smart works
+- 'other': Unclassified chatter
 
-Identify the user intent:
-- 'place_order': User requests produce, quantities, or supplies for tomorrow
-- 'confirm_agreement': User replies "NDIYO", "YES", "Sawa", "Confirm", "Thibitisha", "1"
-- 'report_dispute': User mentions "TATIZO", damaged, rotten, spoiled, missing produce
-- 'check_price': User asks for current bulk prices or market status
-- 'cancel_order': User wants to cancel an order
-- 'onboarding': New vendor greeting or registering
-- 'help': User asks how the service works
-- 'other': Unrecognized or general banter
-
-Text to analyze:
+Input text:
 "${rawText}"
+
+Current trader category context: ${currentCategory || 'unknown'}
 
 Return ONLY valid JSON matching this schema:
 {
   "intent": "place_order" | "confirm_agreement" | "report_dispute" | "check_price" | "cancel_order" | "onboarding" | "help" | "other",
   "detectedLanguage": "swahili" | "sheng" | "english" | "mixed",
+  "inferredCategory": "hardware" | "salon_beauty" | "produce_kiosk" | "tailoring_textiles" | "kibanda_food" | "boda_parts" | "general_duka",
   "confidence": number between 0 and 1,
   "rawInput": string,
   "extractedEntities": [
     {
-      "produceName": string,
-      "canonicalProduceId": string,
+      "productName": string,
+      "canonicalProductId": string,
+      "category": string,
       "quantity": number,
       "unit": string,
-      "normalizedKg": number,
+      "normalizedBaseQty": number,
+      "brandPreference": string or null,
       "priceCeilingKsh": number or null
     }
   ],
@@ -230,7 +271,7 @@ Return ONLY valid JSON matching this schema:
     "english": string,
     "sheng": string
   },
-  "summaryForVendor": {
+  "summaryForTrader": {
     "swahili": string,
     "sheng": string,
     "english": string
@@ -250,22 +291,23 @@ Return ONLY valid JSON matching this schema:
       return {
         intent: parsed.intent,
         detectedLanguage: parsed.detectedLanguage || 'swahili',
+        inferredCategory: parsed.inferredCategory || currentCategory,
         confidence: parsed.confidence || 0.95,
         rawInput: rawText,
         extractedEntities: parsed.extractedEntities || [],
         requiresClarification: Boolean(parsed.requiresClarification),
         clarificationMessage: parsed.clarificationMessage,
-        summaryForVendor: parsed.summaryForVendor || fallbackResult.summaryForVendor
+        summaryForTrader: parsed.summaryForTrader || fallbackResult.summaryForTrader
       };
     }
     return fallbackResult;
   } catch (error) {
-    console.error('Gemini NLU Parse Error, using fallback:', error);
+    console.error('Gemini NLU Parse Error, using trade-aware fallback:', error);
     return fallbackResult;
   }
 }
 
-function fallbackNluParser(text: string): NluParseResult {
+function fallbackNluParser(text: string, currentCategory?: BusinessTradeCategory): NluParseResult {
   const lower = text.toLowerCase().trim();
 
   // 1. Confirm agreement
@@ -277,19 +319,21 @@ function fallbackNluParser(text: string): NluParseResult {
     lower === '1' ||
     lower.includes('thibitisha') ||
     lower.includes('nimekubali') ||
-    lower.includes('iko sawa')
+    lower.includes('iko sawa') ||
+    lower.includes('confirm')
   ) {
     return {
       intent: 'confirm_agreement',
       detectedLanguage: 'swahili',
+      inferredCategory: currentCategory,
       confidence: 0.98,
       rawInput: text,
       extractedEntities: [],
       requiresClarification: false,
-      summaryForVendor: {
-        swahili: 'Umethibitisha makubaliano.',
+      summaryForTrader: {
+        swahili: 'Umethibitisha makubaliano ya ununuzi.',
         sheng: 'Umeshagonga confirm.',
-        english: 'You have confirmed the micro-agreement.'
+        english: 'You have confirmed the micro-purchase agreement.'
       }
     };
   }
@@ -297,22 +341,25 @@ function fallbackNluParser(text: string): NluParseResult {
   // 2. Dispute
   if (
     lower.includes('tatizo') ||
+    lower.includes('imevunjika') ||
+    lower.includes('imeharibika') ||
     lower.includes('zimeoza') ||
-    lower.includes('zimeharibika') ||
     lower.includes('upungufu') ||
-    lower.includes('ubora mbaya') ||
+    lower.includes('feiki') ||
     lower.includes('dispute') ||
-    lower.includes('shida')
+    lower.includes('shida') ||
+    lower.includes('mabati yamepondoka')
   ) {
     return {
       intent: 'report_dispute',
-      detectedLanguage: lower.includes('shida') || lower.includes('zimeoza') ? 'swahili' : 'sheng',
+      detectedLanguage: lower.includes('shida') || lower.includes('imevunjika') ? 'swahili' : 'sheng',
+      inferredCategory: currentCategory,
       confidence: 0.95,
       rawInput: text,
       extractedEntities: [],
       requiresClarification: false,
-      summaryForVendor: {
-        swahili: 'Kikosi chetu kimepokea ripoti ya tatizo na kinashughulikia sasa hivi.',
+      summaryForTrader: {
+        swahili: 'Kikosi chetu cha usimamizi kimepokea ripoti ya tatizo na kinashughulikia mara moja.',
         sheng: 'Rada ya tatizo imeshika, ops wanacheki sahii.',
         english: 'Dispute ticket registered. Operations team is reviewing.'
       }
@@ -324,119 +371,225 @@ function fallbackNluParser(text: string): NluParseResult {
     return {
       intent: 'check_price',
       detectedLanguage: lower.includes('how much') ? 'english' : 'swahili',
+      inferredCategory: currentCategory,
       confidence: 0.9,
       rawInput: text,
       extractedEntities: [],
       requiresClarification: false,
-      summaryForVendor: {
-        swahili: 'Unaulizia bei za soko za jumla.',
+      summaryForTrader: {
+        swahili: 'Unaulizia bei za jumla kutoka kiwandani.',
         sheng: 'Unacheki bei za jumla leo.',
-        english: 'Inquiring about today bulk wholesale produce prices.'
+        english: 'Inquiring about current wholesale bulk prices.'
       }
     };
   }
 
-  // 4. Place order extraction
+  // 4. Onboarding greetings
+  if (lower === 'hi' || lower === 'hello' || lower === 'niaje' || lower.includes('kujiunga') || lower.includes('mimi ni')) {
+    return {
+      intent: 'onboarding',
+      detectedLanguage: lower.includes('niaje') ? 'sheng' : 'swahili',
+      inferredCategory: currentCategory,
+      confidence: 0.95,
+      rawInput: text,
+      extractedEntities: [],
+      requiresClarification: false,
+      summaryForTrader: {
+        swahili: 'Karibu Soko Smart. Chagua sekta yako ya biashara ili tuunganishe oda yako.',
+        sheng: 'Karibu Soko Smart. Bisha na biashara yako tuanze pooling.',
+        english: 'Welcome to Soko Smart. Select your business trade category.'
+      }
+    };
+  }
+
+  // 5. Multi-Trade Entity Extraction
   const entities: NluParseResult['extractedEntities'] = [];
-  const words = lower;
+  let detectedTrade: BusinessTradeCategory = currentCategory || 'hardware';
 
-  // Tomatoes / Nyanya
-  if (words.includes('nyanya') || words.includes('tomato')) {
-    let qty = 1;
-    let unit = 'gunia';
-    if (words.includes('tatu') || words.includes('3')) qty = 3;
-    else if (words.includes('mbili') || words.includes('2')) qty = 2;
-    else if (words.includes('nne') || words.includes('4')) qty = 4;
-    else if (words.includes('tano') || words.includes('5')) qty = 5;
-
-    if (words.includes('debe')) unit = 'debe';
-    else if (words.includes('kilo')) unit = 'kilo';
-    else if (words.includes('tenga')) unit = 'tenga';
-
-    const factor = unit === 'debe' ? 15 : unit === 'kilo' ? 1 : 60;
+  // --- Hardware terms ---
+  if (lower.includes('saruji') || lower.includes('simiti') || lower.includes('cement') || lower.includes('bamburi')) {
+    detectedTrade = 'hardware';
+    let qty = 20;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
     entities.push({
-      produceName: 'Nyanya',
-      canonicalProduceId: 'prod-nyanya',
+      productName: 'Bamburi Nguvu Cement 32.5R (50kg)',
+      canonicalProductId: 'prod-cement-bamburi',
+      category: 'hardware',
       quantity: qty,
-      unit,
-      normalizedKg: qty * factor,
+      unit: 'mfuko',
+      normalizedBaseQty: qty,
+      brandPreference: 'Bamburi Nguvu 32.5R',
+      priceCeilingKsh: 680
+    });
+  } else if (lower.includes('mabati') || lower.includes('iron sheet') || lower.includes('gauge 30')) {
+    detectedTrade = 'hardware';
+    let qty = 15;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'Corrugated Iron Sheets G30 (2.5m)',
+      canonicalProductId: 'prod-mabati-g30',
+      category: 'hardware',
+      quantity: qty,
+      unit: 'bati',
+      normalizedBaseQty: qty,
+      brandPreference: 'MRM Gauge 30',
+      priceCeilingKsh: 780
+    });
+  } else if (lower.includes('misumari') || lower.includes('nails')) {
+    detectedTrade = 'hardware';
+    let qty = 10;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'Common Wire Nails (3-inch / 4-inch)',
+      canonicalProductId: 'prod-nails-wire',
+      category: 'hardware',
+      quantity: qty,
+      unit: 'kilo',
+      normalizedBaseQty: qty,
+      priceCeilingKsh: 135
+    });
+  }
+  // --- Salon / Beauty terms ---
+  else if (lower.includes('braid') || lower.includes('darling') || lower.includes('nywele') || lower.includes('abuja')) {
+    detectedTrade = 'salon_beauty';
+    let qty = 1;
+    let unit = 'carton';
+    if (lower.includes('bundle') || lower.includes('pcs')) unit = 'bundle';
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'Darling Abuja / Classic Braids (Color #1 / #2)',
+      canonicalProductId: 'prod-darling-braids',
+      category: 'salon_beauty',
+      quantity: qty,
+      unit: unit,
+      normalizedBaseQty: unit === 'carton' ? qty * 48 : qty,
+      brandPreference: 'Darling Original Color #1',
+      priceCeilingKsh: 110
+    });
+  } else if (lower.includes('shampoo') || lower.includes('shampu') || lower.includes('conditioner')) {
+    detectedTrade = 'salon_beauty';
+    let qty = 2;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'Salon Pro Conditioning Herbal Shampoo (5 Litres)',
+      canonicalProductId: 'prod-salon-shampoo',
+      category: 'salon_beauty',
+      quantity: qty,
+      unit: 'jerrican',
+      normalizedBaseQty: qty,
+      priceCeilingKsh: 650
+    });
+  }
+  // --- Tailoring & Textiles terms ---
+  else if (lower.includes('kitambaa') || lower.includes('kanga') || lower.includes('vitenge') || lower.includes('fabric')) {
+    detectedTrade = 'tailoring_textiles';
+    let qty = 3;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'African Print Fabric / Kanga Rolls (6 Yards / Roll)',
+      canonicalProductId: 'prod-kanga-fabric',
+      category: 'tailoring_textiles',
+      quantity: qty,
+      unit: 'roll',
+      normalizedBaseQty: qty,
+      priceCeilingKsh: 950
+    });
+  } else if (lower.includes('uzi') || lower.includes('thread')) {
+    detectedTrade = 'tailoring_textiles';
+    let qty = 1;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'High-Tensile Industrial Sewing Thread Cones',
+      canonicalProductId: 'prod-sewing-thread',
+      category: 'tailoring_textiles',
+      quantity: qty,
+      unit: 'boksi',
+      normalizedBaseQty: qty * 12,
+      priceCeilingKsh: 120
+    });
+  }
+  // --- Produce / Mama Mboga terms ---
+  else if (lower.includes('nyanya') || lower.includes('tomato')) {
+    detectedTrade = 'produce_kiosk';
+    let qty = 2;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'Firm Grade A Tomatoes (60kg Crate)',
+      canonicalProductId: 'prod-nyanya',
+      category: 'produce_kiosk',
+      quantity: qty,
+      unit: 'gunia',
+      normalizedBaseQty: qty,
       priceCeilingKsh: 2400
     });
-  }
-
-  // Sukuma wiki
-  if (words.includes('sukuma') || words.includes('kales')) {
-    let qty = 2;
-    let unit = 'gunia';
-    if (words.includes('tano') || words.includes('5')) qty = 5;
-    else if (words.includes('moja') || words.includes('1')) qty = 1;
-    else if (words.includes('kilo')) {
-      unit = 'kilo';
-      const m = words.match(/(\d+)\s*(kilo|kg)/);
-      if (m) qty = parseInt(m[1], 10);
-      else qty = 40;
-    }
-
-    const factor = unit === 'kilo' ? 1 : 70;
-    entities.push({
-      produceName: 'Sukuma Wiki',
-      canonicalProduceId: 'prod-sukuma',
-      quantity: qty,
-      unit,
-      normalizedKg: qty * factor,
-      priceCeilingKsh: 1500
-    });
-  }
-
-  // Onions / Vitunguu
-  if (words.includes('vitunguu') || words.includes('onion')) {
+  } else if (lower.includes('vitunguu') || lower.includes('onion')) {
+    detectedTrade = 'produce_kiosk';
     let qty = 1;
-    let unit = 'gunia';
-    if (words.includes('mbili') || words.includes('2')) qty = 2;
-    if (words.includes('net')) unit = 'net';
-
-    const factor = unit === 'net' ? 10 : 50;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
     entities.push({
-      produceName: 'Vitunguu',
-      canonicalProduceId: 'prod-vitunguu',
+      productName: 'Red Bulb Onions (50kg Net Bag)',
+      canonicalProductId: 'prod-vitunguu',
+      category: 'produce_kiosk',
       quantity: qty,
-      unit,
-      normalizedKg: qty * factor,
-      priceCeilingKsh: 2800
+      unit: 'gunia',
+      normalizedBaseQty: qty,
+      priceCeilingKsh: 2750
     });
   }
-
-  // Potatoes / Viazi / Waru
-  if (words.includes('viazi') || words.includes('waru') || words.includes('potato')) {
-    let qty = 2;
-    let unit = 'gunia';
-    if (words.includes('tano') || words.includes('5')) qty = 5;
-    if (words.includes('debe')) unit = 'debe';
-
-    const factor = unit === 'debe' ? 16 : 90;
+  // --- Kibanda / Food terms ---
+  else if (lower.includes('mafuta') || lower.includes('cooking oil')) {
+    detectedTrade = 'kibanda_food';
+    let qty = 1;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
     entities.push({
-      produceName: 'Viazi / Waru',
-      canonicalProduceId: 'prod-viazi',
+      productName: 'Refined Vegetable Cooking Oil (20 Litre Jerrican)',
+      canonicalProductId: 'prod-cooking-oil',
+      category: 'kibanda_food',
       quantity: qty,
-      unit,
-      normalizedKg: qty * factor,
-      priceCeilingKsh: 3200
+      unit: 'jerrican',
+      normalizedBaseQty: qty,
+      priceCeilingKsh: 4400
+    });
+  } else if (lower.includes('unga') || lower.includes('ugali')) {
+    detectedTrade = 'kibanda_food';
+    let qty = 2;
+    const match = lower.match(/(\d+)/);
+    if (match) qty = parseInt(match[1], 10);
+    entities.push({
+      productName: 'Fortified Maize Meal Unga (Bundle of 12 x 2kg)',
+      canonicalProductId: 'prod-unga-maize',
+      category: 'kibanda_food',
+      quantity: qty,
+      unit: 'bundle',
+      normalizedBaseQty: qty,
+      priceCeilingKsh: 1650
     });
   }
 
   if (entities.length > 0) {
-    const isSheng = words.includes('niaje') || words.includes('manze') || words.includes('budget') || words.includes('cheki');
+    const isSheng = lower.includes('niaje') || lower.includes('budget') || lower.includes('manze');
     return {
       intent: 'place_order',
       detectedLanguage: isSheng ? 'sheng' : 'swahili',
+      inferredCategory: detectedTrade,
       confidence: 0.92,
       rawInput: text,
       extractedEntities: entities,
       requiresClarification: false,
-      summaryForVendor: {
-        swahili: `Umependekeza kuagiza: ${entities.map(e => `${e.quantity} ${e.unit} za ${e.produceName} (~${e.normalizedKg}kg)`).join(', ')}.`,
-        sheng: `Oda yako ni: ${entities.map(e => `${e.quantity} ${e.unit} ya ${e.produceName}`).join(', ')}.`,
-        english: `Order items: ${entities.map(e => `${e.quantity} ${e.unit} of ${e.produceName}`).join(', ')}.`
+      summaryForTrader: {
+        swahili: `Umependekeza kuagiza: ${entities.map(e => `${e.quantity} ${e.unit} ya ${e.productName}`).join(', ')}.`,
+        sheng: `Oda yako ni: ${entities.map(e => `${e.quantity} ${e.unit} ya ${e.productName}`).join(', ')}.`,
+        english: `Order items: ${entities.map(e => `${e.quantity} ${e.unit} of ${e.productName}`).join(', ')}.`
       }
     };
   }
@@ -444,19 +597,20 @@ function fallbackNluParser(text: string): NluParseResult {
   return {
     intent: 'help',
     detectedLanguage: 'swahili',
+    inferredCategory: currentCategory,
     confidence: 0.7,
     rawInput: text,
     extractedEntities: [],
     requiresClarification: true,
     clarificationMessage: {
-      swahili: 'Tafadhali taja zao unalohitaji (mfano: nyanya, sukuma wiki, vitunguu, viazi) na idadi kama magunia au kilo.',
-      sheng: 'Niambie zao unataka, mfano magunia mbili za nyanya au debe ya waru.',
-      english: 'Please specify the vegetable needed (e.g. tomatoes, kale, onions) and quantity in bags or kg.'
+      swahili: 'Tafadhali taja bidhaa unazohitaji (mfano: saruji, mabati, nywele za kusuka, mafuta ya kupikia) na idadi unayotaka.',
+      sheng: 'Niambie stock unataka ku-pool, mfano mifuko 20 ya saruji au carton ya braids.',
+      english: 'Please specify the stock needed (e.g. cement, iron sheets, braids, cooking oil) and quantities.'
     },
-    summaryForVendor: {
+    summaryForTrader: {
       swahili: 'Taja bidhaa na kiwango unachohitaji.',
       sheng: 'Bisha na oda yako freshi.',
-      english: 'Specify your produce and quantity.'
+      english: 'Specify your stock items and quantity.'
     }
   };
 }
@@ -465,12 +619,12 @@ function fallbackNluParser(text: string): NluParseResult {
 // 2. CONVERSATION STATE MACHINE & RESPONDER
 // ==========================================
 
-async function processVendorMessage(phone: string, text: string) {
+async function processTraderMessage(phone: string, text: string) {
   const session = getOrCreateSession(phone);
-  const nlu = await parseVendorMessageWithAI(text);
+  const nlu = await parseTraderMessageWithAI(text, session.category);
 
   session.history.push({
-    role: 'vendor',
+    role: 'trader',
     text,
     timestamp: new Date().toISOString()
   });
@@ -481,36 +635,47 @@ async function processVendorMessage(phone: string, text: string) {
   let stkAmount = 0;
 
   switch (nlu.intent) {
+    case 'onboarding': {
+      session.currentStep = 'ONBOARDING_CATEGORY';
+      replyText = `Karibu Soko Smart! Tunasaidia wafanyabiashara wa jua kali, maduka, saluni na vibanda kuunganisha oda ili kununua moja kwa moja kutoka kiwandani kwa bei ya chini.\n\nBiashara yako inahusu nini? Chagua kategoria:`;
+      quickReplies = [
+        { title: '1. Vifaa vya Ujenzi & Hardware', payload: 'cat_hardware' },
+        { title: '2. Saluni & Vipodozi (Beauty)', payload: 'cat_salon' },
+        { title: '3. Mboga & Matunda (Mama Mboga)', payload: 'cat_produce' },
+        { title: '4. Vitambaa & Ushonaji (Tailoring)', payload: 'cat_tailoring' },
+        { title: '5. Chakula & Kibanda (Kiosk)', payload: 'cat_food' }
+      ];
+      break;
+    }
+
     case 'confirm_agreement': {
-      // Find agreement pending confirmation for this vendor
+      // Find agreement pending confirmation for this trader
       const matchedAgreement = agreements.find(
-        a => a.status === 'pending_confirmation' && a.vendorConfirmations[session.vendorId || '']?.confirmed === false
+        a => a.status === 'pending_confirmation' && a.businessConfirmations[session.businessId || '']?.confirmed === false
       ) || agreements[0];
 
-      if (matchedAgreement && session.vendorId) {
-        matchedAgreement.vendorConfirmations[session.vendorId] = {
+      if (matchedAgreement && session.businessId) {
+        matchedAgreement.businessConfirmations[session.businessId] = {
           confirmed: true,
           timestamp: new Date().toISOString(),
           channel: 'whatsapp'
         };
 
-        // Check if all confirmed
-        const allConfirmed = Object.values(matchedAgreement.vendorConfirmations).every(v => v.confirmed);
+        const allConfirmed = Object.values(matchedAgreement.businessConfirmations).every(v => v.confirmed);
         if (allConfirmed) {
           matchedAgreement.status = 'confirmed_by_all';
         }
 
-        // Calculate vendor share for STK Push deposit (50%)
         const cluster = clusters.find(c => c.id === matchedAgreement.clusterId);
-        const vendorAlloc = cluster?.vendorBreakdown.find(vb => vb.vendorId === session.vendorId);
-        const totalCost = vendorAlloc ? vendorAlloc.allocatedAmountKsh : 3510;
+        const traderAlloc = cluster?.businessBreakdown.find(bb => bb.businessId === session.businessId);
+        const totalCost = traderAlloc ? traderAlloc.allocatedAmountKsh : 6600;
         stkAmount = Math.round(totalCost * 0.5);
 
-        replyText = `Asante ${session.vendorName}! Ujumbe wako wa "NDIYO" umethibitisha Mkataba #${matchedAgreement.contractNumber}.\n\nTunakutumia ombi la M-PESA STK Push la KSh ${stkAmount.toLocaleString()} (Amana ya 50% ya kuzuiliwa kwenye Escrow ya usalama). Tafadhali weka PIN yako kwenye simu.`;
+        replyText = `Asante ${session.ownerName}! Ujumbe wako wa "NDIYO" umethibitisha Mkataba #${matchedAgreement.contractNumber}.\n\nTunakutumia ombi la M-PESA STK Push la KSh ${stkAmount.toLocaleString()} (Amana ya 50% ya kuzuiliwa kwenye Soko Smart Escrow kwa usalama). Tafadhali weka PIN yako kwenye simu.`;
         triggerStkPush = true;
         session.currentStep = 'AWAITING_PIN';
       } else {
-        replyText = `Asante! Huna mkataba unaosubiri uthibitisho kwa sasa. Ungependa kuweka oda ya kesho?`;
+        replyText = `Asante! Huna mkataba unaosubiri uthibitisho kwa sasa. Ungependa kuweka oda mpya ya jumla?`;
       }
       break;
     }
@@ -518,22 +683,23 @@ async function processVendorMessage(phone: string, text: string) {
     case 'place_order': {
       if (nlu.extractedEntities.length > 0) {
         const first = nlu.extractedEntities[0];
-        const produce = produceCatalog.find(p => p.id === first.canonicalProduceId) || produceCatalog[0];
-        const estPrice = first.normalizedKg ? first.normalizedKg * produce.benchmarkPriceKshPerKg : 2500;
+        const product = products.find(p => p.id === first.canonicalProductId) || products[0];
+        const estTotal = first.normalizedBaseQty ? first.normalizedBaseQty * product.benchmarkPriceKsh : 3000;
 
-        // Save into draft
         session.pendingOrderDraft = {
-          produceId: produce.id,
-          produceName: produce.name,
+          productId: product.id,
+          productName: product.name,
+          category: product.category,
           quantity: first.quantity || 1,
-          unit: first.unit || 'gunia',
-          normalizedKg: first.normalizedKg || 60,
+          unit: first.unit || product.defaultUnit,
+          normalizedBaseQty: first.normalizedBaseQty || 1,
           priceCeiling: first.priceCeilingKsh,
-          deliveryDate: 'Kesho Asubuhi (06:30 AM)'
+          brandPreference: first.brandPreference,
+          deliveryDate: 'Kesho / Next Batch Window'
         };
         session.currentStep = 'CONFIRMING_ORDER';
 
-        replyText = `Safi sana! Nimepata oda yako:\n• Zao: ${produce.swahiliName} (${produce.name})\n• Kiasi: ${first.quantity} ${first.unit} (~${first.normalizedKg} kg)\n• Bei ya makadirio ya jumla: ~KSh ${estPrice.toLocaleString()}\n• Kufikishwa: Hamza Market Dropoff, kesho 06:30 AM.\n\nTafadhali jibu "NDIYO" au bonyeza 1 ili kuunganisha oda yako na wenzako Makadara.`;
+        replyText = `Safi sana! Nimepata oda yako ya ${product.name}:\n• Kiasi: ${first.quantity} ${first.unit} (~${first.normalizedBaseQty} base units)\n• Bei ya makadirio ya jumla ya kiwanda: ~KSh ${estTotal.toLocaleString()}\n• Kituo cha Kushusha: Hamza Central Dropoff, Makadara.\n\nTafadhali jibu "NDIYO" au bonyeza 1 ili kuunganisha oda yako na wafanyabiashara wenzako.`;
 
         quickReplies = [
           { title: '1. Thibitisha (NDIYO)', payload: 'confirm_order_draft' },
@@ -541,7 +707,7 @@ async function processVendorMessage(phone: string, text: string) {
           { title: '3. Futa', payload: 'cancel' }
         ];
       } else {
-        replyText = nlu.clarificationMessage?.swahili || 'Tafadhali taja zao na kiasi unachotaka kesho.';
+        replyText = nlu.clarificationMessage?.swahili || 'Tafadhali taja bidhaa na idadi unayotaka kuagiza.';
       }
       break;
     }
@@ -551,47 +717,50 @@ async function processVendorMessage(phone: string, text: string) {
       const newDispute: DisputeTicket = {
         id: `disp-${Date.now().toString().slice(-4)}`,
         orderId: 'ord-today',
-        clusterId: 'cluster-makadara-nyanya-01',
-        vendorId: session.vendorId || 'vendor-unknown',
-        vendorName: session.vendorName || 'Mama Mboga',
-        vendorPhone: phone,
-        produceName: 'Nyanya / Mboga',
-        issueType: 'rotten_produce',
+        clusterId: 'cluster-hardware-makadara-01',
+        category: session.category || 'hardware',
+        businessId: session.businessId || 'biz-unknown',
+        businessName: session.businessName || 'Biashara',
+        phone: phone,
+        productName: 'Bidhaa za Jumla',
+        issueType: 'damaged_item',
         description: text,
-        claimedAmountKsh: 450,
+        claimedAmountKsh: 1320,
         status: 'open',
         createdAt: new Date().toISOString()
       };
       disputes.unshift(newDispute);
 
-      replyText = `Pole sana ${session.vendorName}. Tumefungua tiketi rasmi ya tatizo (#${newDispute.id}).\n\nMhudumu wetu wa usimamizi (Ops Lead) wa Makadara anashughulikia sasa hivi. Utafidiwa au kurejeshewa pesa kwa M-PESA mara moja ikiwa kuna upungufu au mboga iliyooza.\n\nTuma picha au maelezo zaidi hapa ikiwa unayo.`;
+      replyText = `Pole sana ${session.ownerName}. Tumefungua tiketi rasmi ya tatizo (#${newDispute.id}) kwa ajili ya bidhaa zako.\n\nMhudumu wa Soko Smart Operations anashughulikia sasa hivi. Utafidiwa au kurejeshewa pesa kwa M-PESA kutoka kwenye escrow mara tu ukaguzi unapothibitishwa.\n\nTuma picha ya bidhaa hapa ikiwa unayo.`;
       break;
     }
 
     case 'check_price': {
-      const summaryList = produceCatalog
+      const categoryProducts = session.category
+        ? products.filter(p => p.category === session.category)
+        : products.slice(0, 5);
+
+      const summaryList = categoryProducts
         .slice(0, 4)
-        .map(p => `• ${p.swahiliName}: KSh ${p.benchmarkPriceKshPerKg}/kg (~KSh ${Math.round(p.benchmarkPriceKshPerKg * (p.supportedUnits[0]?.factorToKg || 60))} kwa ${p.supportedUnits[0]?.label})`)
+        .map(p => `• ${p.swahiliName}: KSh ${p.benchmarkPriceKsh} kwa ${p.defaultUnit}`)
         .join('\n');
 
-      replyText = `Bei za Jumla za Makadara Leo (Direct Farm-Gate):\n${summaryList}\n\nUngependa kuweka oda ya kesho? Andika mfano: "Nataka magunia 2 ya nyanya"`;
+      replyText = `Bei za Jumla za Kiwanda Leo (Soko Smart Bulk Rates):\n${summaryList}\n\nUngependa kuweka oda ya pamoja? Andika mfano unachotaka.`;
       break;
     }
 
-    case 'onboarding':
     case 'help':
     default: {
-      replyText = `Karibu Soko Smart! Tunasaidia Mama Mboga wa Makadara kuunganisha maagizo ya mboga ili kununua kwa bei ya chini kabisa kutoka kwa vyama vya wakulima (cooperatives).\n\nUnaweza:\n1. Kuagiza mboga kwa kuandika au kutuma sauti: "Nataka magunia 3 za nyanya kesho"\n2. Kuangalia bei: "Niambie bei za leo"\n3. Kuripoti tatizo: "TATIZO"`;
+      replyText = `Karibu Soko Smart! Mratibu wa ununuzi wa pamoja kwa wafanyabiashara wa Kenya.\n\nUnaweza:\n1. Kuagiza bidhaa: "Nahitaji mifuko 20 ya saruji Bamburi" au "Carton 1 ya Darling braids"\n2. Kuangalia bei: "Niambie bei za leo"\n3. Kuripoti tatizo la mzigo: "TATIZO"`;
       quickReplies = [
-        { title: 'Agiza Nyanya (2 Magunia)', payload: 'order_nyanya_2' },
-        { title: 'Agiza Sukuma Wiki', payload: 'order_sukuma' },
+        { title: 'Saruji Bamburi (20 Mifuko)', payload: 'order_cement' },
+        { title: 'Darling Braids (1 Carton)', payload: 'order_braids' },
         { title: 'Angalia Bei za Leo', payload: 'check_prices' }
       ];
       break;
     }
   }
 
-  // Record agent reply
   session.history.push({
     role: 'agent',
     text: replyText,
@@ -616,16 +785,16 @@ async function processVendorMessage(phone: string, text: string) {
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
-    appName: 'Soko Smart',
-    version: '1.0.0',
+    appName: 'Soko Smart Agentic B2B Coordinator',
+    version: '2.0.0',
     geminiEnabled: Boolean(geminiApiKey),
-    neighbourhood: 'Makadara, Nairobi',
+    neighbourhood: 'Makadara Corridor, Nairobi',
+    supportedTrades: TRADE_CATEGORIES.map(t => t.name),
     time: new Date().toISOString()
   });
 });
 
 // --- Meta WhatsApp Webhook ---
-// Verification endpoint
 app.get('/api/webhook/whatsapp', (req: Request, res: Response) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -633,18 +802,15 @@ app.get('/api/webhook/whatsapp', (req: Request, res: Response) => {
   const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || 'soko_smart_verify_token_2026';
 
   if (mode === 'subscribe' && token === expectedToken) {
-    console.log('WhatsApp Webhook verified successfully.');
     res.status(200).send(challenge);
   } else {
     res.status(403).json({ error: 'Verification token mismatch' });
   }
 });
 
-// WhatsApp incoming messages endpoint
 app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
   try {
     const body = req.body;
-    // Standard Meta Cloud API payload extraction
     if (body.object === 'whatsapp_business_account') {
       for (const entry of body.entry || []) {
         for (const change of entry.changes || []) {
@@ -658,11 +824,11 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
               } else if (msg.type === 'interactive') {
                 incomingText = msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || '';
               } else if (msg.type === 'audio') {
-                incomingText = 'Nataka magunia mawili ya nyanya na gunia moja ya viazi kesho'; // Transcribed fallback
+                incomingText = 'Nahitaji mifuko ishirini ya saruji Bamburi kesho asubuhi';
               }
 
               if (incomingText) {
-                await processVendorMessage(`+${from}`, incomingText);
+                await processTraderMessage(`+${from}`, incomingText);
               }
             }
           }
@@ -673,23 +839,20 @@ app.post('/api/webhook/whatsapp', async (req: Request, res: Response) => {
       res.status(404).send('Not Found');
     }
   } catch (error) {
-    console.error('WhatsApp webhook error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
   }
 });
 
-// --- Chat Simulation Endpoint (Used by WhatsApp Phone Simulator) ---
+// --- Interactive Chat & Simulator API ---
 app.post('/api/chat/message', async (req: Request, res: Response) => {
   try {
     const { phone, text } = req.body;
     if (!phone || !text) {
       return res.status(400).json({ error: 'phone and text are required' });
     }
-
-    const result = await processVendorMessage(phone, text);
+    const result = await processTraderMessage(phone, text);
     res.json(result);
   } catch (error) {
-    console.error('Chat processing error:', error);
     res.status(500).json({ error: 'Internal chat processing error' });
   }
 });
@@ -700,14 +863,21 @@ app.get('/api/chat/session/:phone', (req: Request, res: Response) => {
   res.json(session);
 });
 
+app.post('/api/chat/reset/:phone', (req: Request, res: Response) => {
+  const phone = req.params.phone;
+  delete traderSessions[phone];
+  const fresh = getOrCreateSession(phone);
+  res.json(fresh);
+});
+
 // --- Direct NLU Parser API ---
 app.post('/api/nlu/parse', async (req: Request, res: Response) => {
   try {
-    const { text } = req.body;
+    const { text, category } = req.body;
     if (!text) {
       return res.status(400).json({ error: 'text is required' });
     }
-    const parsed = await parseVendorMessageWithAI(text);
+    const parsed = await parseTraderMessageWithAI(text, category);
     res.json(parsed);
   } catch (error) {
     res.status(500).json({ error: 'NLU parsing failed' });
@@ -719,42 +889,49 @@ app.post('/api/speech/transcribe', async (req: Request, res: Response) => {
   try {
     const { sampleId, audioBase64 } = req.body;
 
-    // Preset audio sample transcripts in Swahili / Sheng
-    const PRESET_AUDIO_TRANSCRIPTS: Record<string, { transcription: string; detectedLanguage: string; note: string }> = {
-      sample_sarah_nyanya: {
-        transcription: 'Niaje Soko Smart, nataka magunia tatu za nyanya na debe tano za viazi kesho asubuhi budget yangu ni 2400 per gunia.',
+    const PRESET_AUDIO_TRANSCRIPTS: Record<string, { transcription: string; detectedLanguage: string; trade: string; note: string }> = {
+      sample_hardware_cement: {
+        transcription: 'Niaje Soko Smart, nataka mifuko ishirini ya saruji simiti Bamburi kesho asubuhi hapa Jogoo Road.',
         detectedLanguage: 'sheng',
-        note: 'Swahili/Sheng code-switching captured accurately with Kenyan market vocabulary.'
+        trade: 'hardware',
+        note: 'Hardware order with local Swahili/Sheng cement terminology.'
       },
-      sample_wambui_sukuma: {
-        transcription: 'Habari ya jioni. Kesho asubuhi nahitaji sukuma wiki kilo arobaini na vitunguu gunia moja ya kilo hamsini.',
+      sample_salon_braids: {
+        transcription: 'Habari Soko Smart. Nahitaji carton moja ya Darling Abuja braids rangi namba moja na jerrican ya shampoo lita tano.',
         detectedLanguage: 'swahili',
-        note: 'Pure Swahili dialect from Maringo market Mama Mboga.'
+        trade: 'salon_beauty',
+        note: 'Salon beauty wholesale request with brand and packaging units.'
       },
-      sample_achieng_tatizo: {
-        transcription: 'Hallow Soko Smart, TATIZO. Gunia moja ya nyanya niliyopokea asubuhi imeharibika nusu kwa sababu ya joto.',
+      sample_tailoring_kanga: {
+        transcription: 'Hallow, nataka roli tatu za kitambaa cha kanga na boksi moja ya uzi wa mashine kesho.',
         detectedLanguage: 'swahili',
+        trade: 'tailoring_textiles',
+        note: 'Tailoring fabric and cone thread bulk procurement.'
+      },
+      sample_dispute_hardware: {
+        transcription: 'Hallow Soko Smart, TATIZO. Mabati matatu tuliyoshusha kutoka kwa lori yamepondoka kona vibaya sana.',
+        detectedLanguage: 'swahili',
+        trade: 'hardware',
         note: 'Dispute alert with keyword TATIZO.'
       }
     };
 
     if (sampleId && PRESET_AUDIO_TRANSCRIPTS[sampleId]) {
       const selected = PRESET_AUDIO_TRANSCRIPTS[sampleId];
-      const parsedNlu = await parseVendorMessageWithAI(selected.transcription);
+      const parsedNlu = await parseTraderMessageWithAI(selected.transcription);
       return res.json({
         ...selected,
         nlu: parsedNlu
       });
     }
 
-    // Dynamic browser recording transcription via Gemini if audio provided
     if (audioBase64 && ai) {
       try {
         const response = await ai.models.generateContent({
           model: 'gemini-3.8-flash',
           contents: [
             {
-              text: 'Transcribe this East African voice note accurately. The speaker is speaking Swahili, Sheng, or English. Return only the transcription text.'
+              text: 'Transcribe this Kenyan trader audio note accurately. Language is Swahili, Sheng, or English. Return only transcription.'
             },
             {
               inlineData: {
@@ -764,8 +941,8 @@ app.post('/api/speech/transcribe', async (req: Request, res: Response) => {
             }
           ]
         });
-        const transcription = response.text?.trim() || 'Nataka magunia mawili ya nyanya kesho';
-        const parsedNlu = await parseVendorMessageWithAI(transcription);
+        const transcription = response.text?.trim() || 'Nahitaji mifuko kumi ya saruji Bamburi kesho';
+        const parsedNlu = await parseTraderMessageWithAI(transcription);
         return res.json({
           transcription,
           detectedLanguage: 'swahili',
@@ -777,9 +954,8 @@ app.post('/api/speech/transcribe', async (req: Request, res: Response) => {
       }
     }
 
-    // Default fallback voice note
-    const fallbackText = 'Niaje Soko Smart, nipatie magunia mawili ya nyanya safi kesho asubuhi.';
-    const parsedNlu = await parseVendorMessageWithAI(fallbackText);
+    const fallbackText = 'Niaje Soko Smart, nataka kuagiza bidhaa za jumla kesho asubuhi.';
+    const parsedNlu = await parseTraderMessageWithAI(fallbackText);
     res.json({
       transcription: fallbackText,
       detectedLanguage: 'sheng',
@@ -791,82 +967,87 @@ app.post('/api/speech/transcribe', async (req: Request, res: Response) => {
   }
 });
 
-// --- Demand Orders & Clustering ---
+// --- Demand Orders & Multi-Trade Clustering ---
 app.get('/api/demand/clusters', (_req: Request, res: Response) => {
   res.json({
     clusters,
     orders,
-    cooperatives,
-    vendors
+    suppliers,
+    businesses,
+    tradeCategories: TRADE_CATEGORIES
   });
 });
 
 app.post('/api/demand/orders', (req: Request, res: Response) => {
-  const { vendorId, produceId, rawQuantity, rawUnit, targetPricePerUnitKsh, ward } = req.body;
+  const { businessId, productId, rawQuantity, rawUnit, targetPricePerUnitKsh, ward, category } = req.body;
 
-  const vendor = vendors.find(v => v.id === vendorId) || vendors[0];
-  const produce = produceCatalog.find(p => p.id === produceId) || produceCatalog[0];
+  const biz = businesses.find(b => b.id === businessId) || businesses[0];
+  const prod = products.find(p => p.id === productId) || products[0];
 
-  const unitFactor = produce.supportedUnits.find(u => u.unit === rawUnit)?.factorToKg || 60;
-  const normalizedQtyKg = rawQuantity * unitFactor;
+  const unitFactor = prod.supportedUnits.find(u => u.unit === rawUnit)?.multiplierToBase || 1;
+  const normalizedBaseQty = rawQuantity * unitFactor;
 
   const newOrder: DemandOrder = {
     id: `ord-${Date.now().toString().slice(-4)}`,
-    vendorId: vendor.id,
-    vendorName: vendor.name,
-    phone: vendor.phone,
-    ward: ward || vendor.ward,
-    produceId: produce.id,
-    produceName: produce.name,
+    businessId: biz.id,
+    businessName: biz.businessName,
+    ownerName: biz.ownerName,
+    category: category || prod.category,
+    phone: biz.phone,
+    ward: ward || biz.ward,
+    productId: prod.id,
+    productName: prod.name,
     rawQuantity: Number(rawQuantity),
-    rawUnit: rawUnit || 'gunia',
-    normalizedQtyKg,
-    targetPricePerUnitKsh: Number(targetPricePerUnitKsh) || produce.benchmarkPriceKshPerKg * unitFactor,
-    deliveryDate: '2026-09-28',
+    rawUnit: rawUnit || prod.defaultUnit,
+    normalizedBaseQty,
+    targetPricePerUnitKsh: Number(targetPricePerUnitKsh) || prod.benchmarkPriceKsh,
+    deliveryDate: '2026-09-29',
     createdAt: new Date().toISOString(),
     status: 'open'
   };
 
   orders.unshift(newOrder);
 
-  // Re-cluster for this produce
-  let matchedCluster = clusters.find(c => c.produceId === produce.id && c.status === 'open');
+  // Cluster by product + trade category
+  let matchedCluster = clusters.find(c => c.productId === prod.id && c.status === 'open');
   if (!matchedCluster) {
     matchedCluster = {
-      id: `cluster-makadara-${produce.id}-${Date.now().toString().slice(-4)}`,
+      id: `cluster-${prod.category}-${Date.now().toString().slice(-4)}`,
+      category: prod.category,
       neighbourhood: 'Makadara Corridor (Hamza, Maringo, Viwandani)',
-      produceId: produce.id,
-      produceName: produce.name,
-      totalQuantityKg: 0,
+      productId: prod.id,
+      productName: prod.name,
+      totalQuantityBase: 0,
       unitSummary: '',
-      vendorCount: 0,
+      businessCount: 0,
       orderIds: [],
-      vendorBreakdown: [],
-      moqKg: produce.moqKg,
+      businessBreakdown: [],
+      moqBase: prod.moqBaseUnit,
       moqMet: false,
-      benchmarkPricePerKg: produce.benchmarkPriceKshPerKg,
-      targetPriceCeilingPerKg: produce.guardrailMaxKshPerKg,
+      benchmarkPricePerUnit: prod.benchmarkPriceKsh,
+      targetPriceCeilingPerUnit: prod.guardrailMaxKsh,
       status: 'open',
-      cutoffTime: '18:00 EAT Today',
-      deliveryDate: '2026-09-28'
+      cutoffTime: '17:00 EAT Today',
+      deliveryDate: '2026-09-29'
     };
     clusters.unshift(matchedCluster);
   }
 
   newOrder.clusterId = matchedCluster.id;
   matchedCluster.orderIds.push(newOrder.id);
-  matchedCluster.vendorCount += 1;
-  matchedCluster.totalQuantityKg += normalizedQtyKg;
-  matchedCluster.moqMet = matchedCluster.totalQuantityKg >= matchedCluster.moqKg;
-  matchedCluster.unitSummary = `${Math.round(matchedCluster.totalQuantityKg / unitFactor)} ${rawUnit} (~${matchedCluster.totalQuantityKg} kg)`;
+  matchedCluster.businessCount += 1;
+  matchedCluster.totalQuantityBase += normalizedBaseQty;
+  matchedCluster.moqMet = matchedCluster.totalQuantityBase >= matchedCluster.moqBase;
+  matchedCluster.unitSummary = `${matchedCluster.totalQuantityBase} ${prod.defaultUnit}`;
 
-  matchedCluster.vendorBreakdown.push({
-    vendorId: vendor.id,
-    vendorName: vendor.name,
-    phone: vendor.phone,
-    quantityKg: normalizedQtyKg,
+  matchedCluster.businessBreakdown.push({
+    businessId: biz.id,
+    businessName: biz.businessName,
+    ownerName: biz.ownerName,
+    phone: biz.phone,
+    quantityBase: normalizedBaseQty,
     rawDisplay: `${rawQuantity} ${rawUnit}`,
-    allocatedAmountKsh: Math.round(normalizedQtyKg * produce.benchmarkPriceKshPerKg)
+    allocatedAmountKsh: Math.round(normalizedBaseQty * prod.benchmarkPriceKsh)
   });
 
   res.status(201).json({
@@ -875,7 +1056,6 @@ app.post('/api/demand/orders', (req: Request, res: Response) => {
   });
 });
 
-// Force lock cluster and advance to negotiation
 app.post('/api/demand/clusters/:id/lock', (req: Request, res: Response) => {
   const cluster = clusters.find(c => c.id === req.params.id);
   if (!cluster) {
@@ -884,40 +1064,39 @@ app.post('/api/demand/clusters/:id/lock', (req: Request, res: Response) => {
 
   cluster.status = 'negotiating';
 
-  // Assign best matching cooperative
-  const matchedCoop = cooperatives.find(co => co.availableProduce.includes(cluster.produceId)) || cooperatives[0];
-  cluster.cooperativeId = matchedCoop.id;
-  cluster.cooperativeName = matchedCoop.name;
+  const matchedSupp = suppliers.find(s => s.category === cluster.category) || suppliers[0];
+  cluster.supplierId = matchedSupp.id;
+  cluster.supplierName = matchedSupp.name;
 
-  // Initialize negotiation session if not present
   if (!negotiationSessions[cluster.id]) {
-    const produce = produceCatalog.find(p => p.id === cluster.produceId) || produceCatalog[0];
-    const initialAsk = Math.round(produce.benchmarkPriceKshPerKg * 1.08);
-    const initialCounter = produce.benchmarkPriceKshPerKg;
+    const prod = products.find(p => p.id === cluster.productId) || products[0];
+    const initialAsk = Math.round(prod.benchmarkPriceKsh * 1.05);
+    const initialCounter = prod.benchmarkPriceKsh;
 
     negotiationSessions[cluster.id] = {
       id: `neg-${cluster.id}`,
       clusterId: cluster.id,
-      cooperativeId: matchedCoop.id,
-      cooperativeName: matchedCoop.name,
-      produceName: cluster.produceName,
-      totalKg: cluster.totalQuantityKg,
+      category: cluster.category,
+      supplierId: matchedSupp.id,
+      supplierName: matchedSupp.name,
+      productName: cluster.productName,
+      totalUnits: cluster.totalQuantityBase,
       status: 'in_progress',
       guardrails: {
-        minPricePerKg: produce.guardrailMinKshPerKg,
-        maxPricePerKg: produce.guardrailMaxKshPerKg,
+        minPricePerUnit: prod.guardrailMinKsh,
+        maxPricePerUnit: prod.guardrailMaxKsh,
         requiredDeliveryDate: cluster.deliveryDate,
-        paymentSplit: '50% on agreement, 50% upon delivery inspection'
+        paymentSplit: '50% on agreement via STK Push, 50% upon delivery inspection'
       },
-      initialAskPricePerKg: initialAsk,
-      currentCounterPricePerKg: initialCounter,
+      initialAskPricePerUnit: initialAsk,
+      currentCounterPricePerUnit: initialCounter,
       transcript: [
         {
           id: `nm-${Date.now()}-1`,
           sender: 'agent',
-          senderName: 'Soko Smart Coordinator',
-          message: `Habari ${matchedCoop.name}. Muungano wa Mama Mboga Makadara una oda ya pamoja ya kilo ${cluster.totalQuantityKg} za ${cluster.produceName}. Tunalipa 50% escrow mara moja na kupokea asubuhi 06:30 AM. Bei yetu ya ununuzi ni KSh ${initialCounter} kwa kilo.`,
-          priceOfferPerKg: initialCounter,
+          senderName: 'Soko Smart AI Coordinator',
+          message: `Habari ${matchedSupp.name}. Wafanyabiashara wa Makadara wameunganisha agizo la pamoja la ${cluster.totalQuantityBase} units za ${cluster.productName}. Tunalipa 50% escrow mara moja na kupokea asubuhi. Bei yetu ya jumla ni KSh ${initialCounter} kwa unit.`,
+          priceOfferPerUnit: initialCounter,
           timestamp: new Date().toISOString()
         }
       ]
@@ -927,7 +1106,7 @@ app.post('/api/demand/clusters/:id/lock', (req: Request, res: Response) => {
   res.json({ cluster, negotiation: negotiationSessions[cluster.id] });
 });
 
-// --- Cooperative Negotiation Engine ---
+// --- Supplier Bounded Negotiation Engine ---
 app.get('/api/negotiation/:clusterId', (req: Request, res: Response) => {
   const session = negotiationSessions[req.params.clusterId];
   if (!session) {
@@ -936,36 +1115,34 @@ app.get('/api/negotiation/:clusterId', (req: Request, res: Response) => {
   res.json(session);
 });
 
-app.post('/api/negotiation/:clusterId/coop-reply', (req: Request, res: Response) => {
+app.post('/api/negotiation/:clusterId/supplier-reply', (req: Request, res: Response) => {
   const session = negotiationSessions[req.params.clusterId];
   if (!session) {
     return res.status(404).json({ error: 'Negotiation session not found' });
   }
 
-  const { proposedPricePerKg, message } = req.body;
-  const offeredPrice = Number(proposedPricePerKg);
+  const { proposedPricePerUnit, message } = req.body;
+  const offeredPrice = Number(proposedPricePerUnit);
 
-  // Log coop message
   session.transcript.push({
     id: `nm-${Date.now()}`,
-    sender: 'cooperative',
-    senderName: session.cooperativeName,
-    message: message || `Bei yetu ni KSh ${offeredPrice}/kg kwa sababu ya gharama za mafuta na usafiri.`,
-    priceOfferPerKg: offeredPrice,
+    sender: 'supplier',
+    senderName: session.supplierName,
+    message: message || `Bei yetu ya kiwanda ni KSh ${offeredPrice} kwa unit kutokana na gharama za usambazaji.`,
+    priceOfferPerUnit: offeredPrice,
     timestamp: new Date().toISOString()
   });
 
-  // Check platform guardrails!
-  if (offeredPrice > session.guardrails.maxPricePerKg) {
-    // VIOLATION: Exceeds platform ceiling -> Escalate to Human Ops!
+  // Guardrail Check
+  if (offeredPrice > session.guardrails.maxPricePerUnit) {
     session.status = 'escalated_to_ops';
-    session.escalationReason = `Bei iliyoombwa na mkulima (KSh ${offeredPrice}/kg) imevuka kikomo cha juu cha jukwaa (KSh ${session.guardrails.maxPricePerKg}/kg). Inahitaji idhini ya afisa wa ununuzi.`;
+    session.escalationReason = `Bei iliyoombwa na msambazaji (KSh ${offeredPrice}) imevuka kikomo cha juu cha Soko Smart (KSh ${session.guardrails.maxPricePerUnit}). Inahitaji idhini ya afisa wa ununuzi.`;
 
     session.transcript.push({
       id: `nm-${Date.now()}-esc`,
       sender: 'agent',
       senderName: 'Soko Smart Safety Guardrail',
-      message: `[KIKOMO KIMEKIUKWA] Bei ya KSh ${offeredPrice}/kg inazidi kiwango cha juu (KSh ${session.guardrails.maxPricePerKg}/kg). Mazungumzo yamesitishwa kwa ukaguzi wa Afisa wa Ununuzi (Human-in-the-Loop).`,
+      message: `[KIKOMO KIMEKIUKWA]: Bei ya KSh ${offeredPrice} inazidi kiwango cha juu (KSh ${session.guardrails.maxPricePerUnit}). Mazungumzo yamesitishwa kwa ukaguzi wa Afisa wa Ununuzi (Human-in-the-Loop).`,
       timestamp: new Date().toISOString(),
       isEscalationTrigger: true
     });
@@ -973,37 +1150,34 @@ app.post('/api/negotiation/:clusterId/coop-reply', (req: Request, res: Response)
     return res.json({ session, escalated: true });
   }
 
-  // If within guardrails: Agent accepts or makes tight counter-offer
-  if (offeredPrice <= session.currentCounterPricePerKg + 1) {
+  if (offeredPrice <= session.currentCounterPricePerUnit + (offeredPrice * 0.03)) {
     session.status = 'agreed';
-    session.agreedPricePerKg = offeredPrice;
+    session.agreedPricePerUnit = offeredPrice;
 
     session.transcript.push({
       id: `nm-${Date.now()}-agree`,
       sender: 'agent',
-      senderName: 'Soko Smart AI Agent',
-      message: `Tumekubaliana kwa KSh ${offeredPrice}/kg! Tunatayarisha Mkataba wa Kielektroniki (Micro-Agreement) na kutuma kwa pande zote mbili mara moja.`,
-      priceOfferPerKg: offeredPrice,
+      senderName: 'Soko Smart AI Coordinator',
+      message: `Tumekubaliana kwa KSh ${offeredPrice} kwa unit! Tunatayarisha Mkataba wa Kielektroniki (Micro-Agreement) na kutuma kwa pande zote mbili mara moja.`,
+      priceOfferPerUnit: offeredPrice,
       timestamp: new Date().toISOString()
     });
 
-    // Update cluster
     const cluster = clusters.find(c => c.id === session.clusterId);
     if (cluster) {
       cluster.status = 'agreement_drafted';
-      cluster.negotiatedPricePerKg = offeredPrice;
+      cluster.negotiatedPricePerUnit = offeredPrice;
     }
   } else {
-    // Counter-offer halfway between agent target and coop offer
-    const counter = Math.min(session.guardrails.maxPricePerKg, Math.round((session.currentCounterPricePerKg + offeredPrice) / 2));
-    session.currentCounterPricePerKg = counter;
+    const counter = Math.min(session.guardrails.maxPricePerUnit, Math.round((session.currentCounterPricePerUnit + offeredPrice) / 2));
+    session.currentCounterPricePerUnit = counter;
 
     session.transcript.push({
       id: `nm-${Date.now()}-counter`,
       sender: 'agent',
-      senderName: 'Soko Smart AI Agent',
-      message: `Tunaelewa gharama za usafiri, lakini wamama wananunua kiasi kikubwa cha kilo ${session.totalKg}. Tunaweza kufanya KSh ${counter}/kg ikiwa mtashusha kabla ya 06:30 AM. Je, hii inafaa?`,
-      priceOfferPerKg: counter,
+      senderName: 'Soko Smart AI Coordinator',
+      message: `Tunaelewa gharama za usafiri, lakini wafanyabiashara wetu wananunua kiasi kikubwa cha ${session.totalUnits} units na malipo ya uhakika ya M-PESA escrow. Tunaweza kufanya KSh ${counter} kwa unit?`,
+      priceOfferPerUnit: counter,
       timestamp: new Date().toISOString()
     });
   }
@@ -1011,41 +1185,40 @@ app.post('/api/negotiation/:clusterId/coop-reply', (req: Request, res: Response)
   res.json({ session, escalated: false });
 });
 
-// Human-in-the-loop override endpoint
 app.post('/api/negotiation/:clusterId/human-override', (req: Request, res: Response) => {
   const session = negotiationSessions[req.params.clusterId];
   if (!session) {
     return res.status(404).json({ error: 'Negotiation session not found' });
   }
 
-  const { action, approvedPricePerKg, notes } = req.body;
+  const { action, approvedPricePerUnit, notes } = req.body;
   if (action === 'approve') {
-    const finalPrice = Number(approvedPricePerKg) || session.guardrails.maxPricePerKg;
+    const finalPrice = Number(approvedPricePerUnit) || session.guardrails.maxPricePerUnit;
     session.status = 'agreed';
-    session.agreedPricePerKg = finalPrice;
+    session.agreedPricePerUnit = finalPrice;
     session.opsApproved = true;
 
     session.transcript.push({
       id: `nm-${Date.now()}-ops`,
       sender: 'human_ops',
-      senderName: 'Human Operations Lead (Makadara)',
-      message: `[IDHINI YA BINADAMU / OPS OVERRIDE]: Bei ya KSh ${finalPrice}/kg imeidhinishwa. Maelezo: ${notes || 'Kupanda kwa bei kote Nairobi kutokana na mvua.'}`,
-      priceOfferPerKg: finalPrice,
+      senderName: 'Soko Smart Buyer Representative (Human Ops)',
+      message: `[IDHINI YA BINADAMU / OPS OVERRIDE]: Bei ya KSh ${finalPrice} imeidhinishwa. Sababu: ${notes || 'Kupanda kwa gharama za kiwanda nchi nzima.'}`,
+      priceOfferPerUnit: finalPrice,
       timestamp: new Date().toISOString()
     });
 
     const cluster = clusters.find(c => c.id === session.clusterId);
     if (cluster) {
       cluster.status = 'agreement_drafted';
-      cluster.negotiatedPricePerKg = finalPrice;
+      cluster.negotiatedPricePerUnit = finalPrice;
     }
   } else {
     session.status = 'rejected';
     session.transcript.push({
       id: `nm-${Date.now()}-ops-rej`,
       sender: 'human_ops',
-      senderName: 'Human Operations Lead (Makadara)',
-      message: `[IMEKATALIWA]: Ofa ya mkulima imekataliwa. Tunahamisha oda kwa chama mbadala cha wakulima.`,
+      senderName: 'Soko Smart Buyer Representative (Human Ops)',
+      message: `[IMEKATALIWA]: Ofa ya msambazaji imekataliwa. Tunatafuta msambazaji mbadala wa kundi hili.`,
       timestamp: new Date().toISOString()
     });
   }
@@ -1061,91 +1234,94 @@ app.post('/api/agreements/generate', (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Cluster not found' });
   }
 
-  const coop = cooperatives.find(co => co.id === cluster.cooperativeId) || cooperatives[0];
-  const agreedPrice = cluster.negotiatedPricePerKg || cluster.benchmarkPricePerKg;
-  const totalValue = cluster.totalQuantityKg * agreedPrice;
-  const contractNum = `SS-MKD-${Date.now().toString().slice(-6)}`;
+  const supp = suppliers.find(s => s.id === cluster.supplierId) || suppliers[0];
+  const agreedPrice = cluster.negotiatedPricePerUnit || cluster.benchmarkPricePerUnit;
+  const totalValue = cluster.totalQuantityBase * agreedPrice;
+  const contractNum = `SK254-${cluster.category.slice(0, 2).toUpperCase()}-${Date.now().toString().slice(-6)}`;
 
-  const swahiliAgreement = `MAKUBALIANO YA KIPINDI YA UTOAJI MAZAO (SOKO SMART)
+  const swahiliAgreement = `MKATABA WA UNUNUZI WA PAMOJA WA KIELEKTRONIKI (SOKO SMART)
 Nambari ya Mkataba: ${contractNum}
 Tarehe: ${new Date().toLocaleDateString('en-GB')}
+Sekta ya Biashara: ${cluster.category.toUpperCase()}
 
 Pande Zinazohusika:
-1. Chama cha Wakulima: ${coop.name} (${coop.phone})
-2. Muungano wa Mama Mboga Makadara (Wafanyabiashara ${cluster.vendorCount})
+1. Msambazaji / Kiwanda: ${supp.name} (${supp.phone})
+2. Muungano wa Wafanyabiashara Makadara (Wanachama ${cluster.businessCount})
 
 Maelezo ya Agizo:
-- Zao: ${cluster.produceName}
-- Jumla ya Uzani: Kilo ${cluster.totalQuantityKg.toLocaleString()} (${cluster.unitSummary})
-- Bei Iliyokubaliwa: KSh ${agreedPrice} kwa kila kilo
-- Thamani Kamili: KSh ${totalValue.toLocaleString()}
+- Bidhaa: ${cluster.productName}
+- Jumla ya Idadi Iliyokusanywa: ${cluster.totalQuantityBase} units (${cluster.unitSummary})
+- Bei Iliyokubaliwa ya Jumla: KSh ${agreedPrice} kwa unit
+- Thamani Kamili ya Mkataba: KSh ${totalValue.toLocaleString()}
 
-Muda na Mahali pa Kuwasilisha:
-- Tarehe ya Kufikishwa: ${cluster.deliveryDate} kabla ya saa 12:30 Asubuhi (06:30 AM EAT)
-- Eneo la Kushusha: Makadara Central Produce Dropoff Shed (Hamza Market, Jogoo Road)
+Muda na Mahali pa Kushusha Mzigo:
+- Tarehe ya Kufikishwa: ${cluster.deliveryDate} kabla ya saa 08:30 Asubuhi
+- Eneo la Kushusha: Hamza Central B2B Staging Hub, Jogoo Road, Makadara
 
-Masharti ya Malipo na Ukaguzi:
-- Asilimia 50 (KSh ${(totalValue * 0.5).toLocaleString()}) inalipwa na kuzuiliwa kwenye akaunti ya Soko Smart Escrow kupitia M-PESA.
-- Asilimia 50 inayobaki inatolewa kwa mkulima mara moja baada ya wawakilishi wa Mama Mboga kukagua uzani na ubora.
-- Ikitokea upungufu wa uzani au mboga kuharibika njiani, Mama Mboga anatuma "TATIZO" na picha kabla ya saa 2:30 Asubuhi kwa fidia au marejesho.
+Masharti ya Malipo na Escrow:
+- Asilimia 50 (KSh ${(totalValue * 0.5).toLocaleString()}) inazuiliwa kwenye akaunti salama ya Soko Smart Escrow kupitia M-PESA STK Push.
+- Asilimia 50 inayobaki inatolewa kwa msambazaji mara tu wawakilishi wanapokagua ubora, chapa na idadi ya mzigo.
+- Ikitokea uharibifu au bidhaa feki, mfanyabiashara anatuma "TATIZO" na picha ndani ya saa 3 kwa rejesho la papo hapo.
 
 Uthibitisho:
-Mkulima na kila Mama Mboga anathibitisha kwa kutuma neno "NDIYO" au "YES" kwenye WhatsApp ya Soko Smart.`;
+Pande zote zinathibitisha kwa kutuma neno "NDIYO" au "YES" kwenye WhatsApp ya Soko Smart.`;
 
-  const englishAgreement = `SOKO SMART MICRO-DELIVERY PRODUCE AGREEMENT
+  const englishAgreement = `SOKO SMART B2B POOLED PURCHASE AGREEMENT
 Agreement Reference: ${contractNum}
 Date of Issuance: ${new Date().toLocaleDateString('en-GB')}
+Trade Category: ${cluster.category.toUpperCase()}
 
 Parties:
-1. Supplier Cooperative: ${coop.name} (${coop.phone})
-2. Buyer Cluster: Makadara Mama Mboga Pool (${cluster.vendorCount} Vendors)
+1. Supplier / Wholesale Depot: ${supp.name} (${supp.phone})
+2. Buyer Cluster: Makadara Small Traders Pool (${cluster.businessCount} Merchants)
 
-Order Specification:
-- Produce: ${cluster.produceName} (Standard Grade A)
-- Total Pooled Volume: ${cluster.totalQuantityKg.toLocaleString()} kg (${cluster.unitSummary})
-- Agreed Farm-Gate Bulk Price: KSh ${agreedPrice}.00 per kg
-- Total Agreement Consideration: KSh ${totalValue.toLocaleString()}.00
+Specification:
+- Product: ${cluster.productName}
+- Total Aggregated Volume: ${cluster.totalQuantityBase} units (${cluster.unitSummary})
+- Agreed Factory Bulk Rate: KSh ${agreedPrice}.00 per unit
+- Total Consideration: KSh ${totalValue.toLocaleString()}.00
 
 Logistics & Delivery Schedule:
-- Delivery Window: ${cluster.deliveryDate}, strictly before 06:30 AM EAT
-- Drop-off Staging Hub: Makadara Central Produce Dropoff Shed (Adjacent Hamza Market, Jogoo Road)
+- Delivery Window: ${cluster.deliveryDate}, strictly before 08:30 AM EAT
+- Drop-off Bay: Hamza Central B2B Staging Hub, Jogoo Road, Makadara
 
-Settlement & Inspection Terms:
-- 50% mobilization advance (KSh ${(totalValue * 0.5).toLocaleString()}.00) held securely in Soko Smart Escrow via individual vendor M-PESA STK pushes.
-- 50% balance released instantly to the cooperative via Daraja B2B upon physical delivery inspection and scale sign-off.
-- In event of spoilage or weight variance exceeding 3%, vendor alerts via "TATIZO" within 2 hours of delivery for automated proportional refund.
+Settlement & Escrow Terms:
+- 50% mobilization deposit (KSh ${(totalValue * 0.5).toLocaleString()}.00) held in Soko Smart Escrow via individual trader M-PESA STK pushes.
+- 50% balance released via Daraja B2B upon verified physical offload and inspection.
+- Mismatched or damaged goods reported within 3 hours via keyword "TATIZO" for proportional credit or immediate reversal.
 
 Consent:
-Confirmed digitally via WhatsApp reply "NDIYO" / "YES" by both cooperative dispatch and pool members.`;
+Formally verified via single-word WhatsApp reply "NDIYO" / "YES" by both wholesale dispatch and cluster merchants.`;
 
-  const vendorConfirmations: Record<string, { confirmed: boolean; channel: 'whatsapp' | 'sms' }> = {};
-  cluster.vendorBreakdown.forEach(vb => {
-    vendorConfirmations[vb.vendorId] = { confirmed: false, channel: 'whatsapp' };
+  const businessConfirmations: Record<string, { confirmed: boolean; channel: 'whatsapp' | 'sms' }> = {};
+  cluster.businessBreakdown.forEach(bb => {
+    businessConfirmations[bb.businessId] = { confirmed: false, channel: 'whatsapp' };
   });
 
   const newAgreement: MicroAgreement = {
     id: `AGR-${contractNum}`,
     contractNumber: contractNum,
+    category: cluster.category,
     clusterId: cluster.id,
-    cooperativeId: coop.id,
-    cooperativeName: coop.name,
-    cooperativePhone: coop.phone,
-    produceName: cluster.produceName,
-    totalQuantityKg: cluster.totalQuantityKg,
-    pricePerKgKsh: agreedPrice,
+    supplierId: supp.id,
+    supplierName: supp.name,
+    supplierPhone: supp.phone,
+    productName: cluster.productName,
+    totalQuantityBase: cluster.totalQuantityBase,
+    pricePerUnitKsh: agreedPrice,
     totalContractValueKsh: totalValue,
-    deliveryDate: `${cluster.deliveryDate} kabla ya 06:30 AM EAT`,
-    deliveryLocation: 'Makadara Central Produce Dropoff Shed (Hamza Market, Jogoo Road)',
-    qualityTerms: 'Bidhaa safi ya shamba ya Daraja A (Firm, Grade A, unblemished, weight verified on calibrated digital scales).',
-    paymentTerms: '50% STK Push deposit to Escrow, 50% Daraja B2B payment on delivery signoff.',
-    disputePolicy: 'Tuma neno "TATIZO" ndani ya saa 2 kurejeshewa pesa au kuletewa mbadala mara moja.',
+    deliveryDate: `${cluster.deliveryDate} kabla ya 08:30 AM EAT`,
+    deliveryLocation: 'Hamza Central B2B Staging Hub, Jogoo Road, Makadara',
+    qualityTerms: 'Bidhaa halisi ya kiwanda iliyofungwa vizuri, isiyo na kasoro, uzani na viwango rasmi vya KEBS.',
+    paymentTerms: '50% STK Push deposit to Escrow, 50% Daraja B2B payout upon offload signoff.',
+    disputePolicy: 'Tuma neno "TATIZO" ndani ya saa 3 kurejeshewa pesa au kuletewa mbadala mara moja.',
     swahiliText: swahiliAgreement,
     englishText: englishAgreement,
     status: 'pending_confirmation',
-    vendorConfirmations,
-    coopConfirmed: true,
-    coopConfirmedTimestamp: new Date().toISOString(),
-    digitalVerificationHash: `sha256-${Date.now().toString(16)}-mkd`,
+    businessConfirmations,
+    supplierConfirmed: true,
+    supplierConfirmedTimestamp: new Date().toISOString(),
+    digitalVerificationHash: `sha256-sk254-${Date.now().toString(16)}`,
     createdAt: new Date().toISOString()
   };
 
@@ -1160,39 +1336,27 @@ app.get('/api/agreements', (_req: Request, res: Response) => {
   res.json(agreements);
 });
 
-app.get('/api/agreements/:id', (req: Request, res: Response) => {
-  const agreement = agreements.find(a => a.id === req.params.id);
-  if (!agreement) {
-    return res.status(404).json({ error: 'Agreement not found' });
-  }
-  res.json(agreement);
-});
-
-// One-tap / one-word agreement confirmation endpoint
 app.post('/api/agreements/:id/confirm', (req: Request, res: Response) => {
   const agreement = agreements.find(a => a.id === req.params.id);
   if (!agreement) {
     return res.status(404).json({ error: 'Agreement not found' });
   }
 
-  const { vendorId, role } = req.body;
-
-  if (role === 'cooperative') {
-    agreement.coopConfirmed = true;
-    agreement.coopConfirmedTimestamp = new Date().toISOString();
-  } else if (vendorId) {
-    agreement.vendorConfirmations[vendorId] = {
+  const { businessId, role } = req.body;
+  if (role === 'supplier') {
+    agreement.supplierConfirmed = true;
+    agreement.supplierConfirmedTimestamp = new Date().toISOString();
+  } else if (businessId) {
+    agreement.businessConfirmations[businessId] = {
       confirmed: true,
       timestamp: new Date().toISOString(),
       channel: 'whatsapp'
     };
   }
 
-  const allVendorsConfirmed = Object.values(agreement.vendorConfirmations).every(v => v.confirmed);
-  if (allVendorsConfirmed && agreement.coopConfirmed) {
+  const allConfirmed = Object.values(agreement.businessConfirmations).every(b => b.confirmed);
+  if (allConfirmed && agreement.supplierConfirmed) {
     agreement.status = 'confirmed_by_all';
-
-    // Update cluster status
     const cluster = clusters.find(c => c.id === agreement.clusterId);
     if (cluster) {
       cluster.status = 'stk_sent';
@@ -1202,13 +1366,12 @@ app.post('/api/agreements/:id/confirm', (req: Request, res: Response) => {
   res.json(agreement);
 });
 
-// --- M-PESA Daraja Integration & Double-Entry Ledger ---
+// --- M-PESA Daraja STK Push & Double-Entry Ledger ---
 
-// STK Push Dispatcher
 app.post('/api/mpesa/stkpush', async (req: Request, res: Response) => {
   try {
-    const { vendorId, phone, amountKsh, purpose, agreementId } = req.body;
-    const cleanPhone = (phone || '254712345678').replace('+', '');
+    const { businessId, phone, amountKsh, purpose, agreementId } = req.body;
+    const cleanPhone = (phone || '254712998877').replace('+', '');
     const amount = Number(amountKsh) || 1000;
     const checkoutReqId = `ws_CO_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
@@ -1216,10 +1379,10 @@ app.post('/api/mpesa/stkpush', async (req: Request, res: Response) => {
       id: `tx-${Date.now().toString().slice(-5)}`,
       checkoutRequestId: checkoutReqId,
       merchantRequestId: `MR-${Date.now().toString().slice(-6)}`,
-      vendorId,
-      vendorPhone: cleanPhone,
+      businessId,
+      phone: cleanPhone,
       amount,
-      purpose: purpose || 'vendor_pool_collection',
+      purpose: purpose || 'trader_pool_collection',
       status: 'pending_pin',
       timestamp: new Date().toISOString(),
       referenceAgreementId: agreementId
@@ -1232,14 +1395,13 @@ app.post('/api/mpesa/stkpush', async (req: Request, res: Response) => {
       checkoutRequestId: checkoutReqId,
       customerMessage: 'Success. Request accepted for processing',
       transaction: newTx,
-      promptText: `Do you want to pay KSh ${amount.toLocaleString()} to SOKO SMART TILL 174379 for Makadara Produce Pool? Enter M-PESA PIN:`
+      promptText: `Do you want to pay KSh ${amount.toLocaleString()} to SOKO SMART TILL 400200 for Pooled Bulk Order? Enter M-PESA PIN:`
     });
   } catch (error) {
     res.status(500).json({ error: 'STK Push failed to dispatch' });
   }
 });
 
-// STK Push PIN Simulation & Webhook Execution
 app.post('/api/mpesa/simulate-phone-stk', (req: Request, res: Response) => {
   const { checkoutRequestId, pin, action } = req.body;
   const tx = mpesaTransactions.find(t => t.checkoutRequestId === checkoutRequestId) || mpesaTransactions[0];
@@ -1255,37 +1417,35 @@ app.post('/api/mpesa/simulate-phone-stk', (req: Request, res: Response) => {
     return res.json({ success: false, tx });
   }
 
-  // Simulate PIN verification
   if (pin && pin.length >= 4) {
     tx.status = 'completed';
     tx.resultCode = 0;
     tx.resultDesc = 'The service request is processed successfully.';
-    tx.mpesaReceiptNumber = `QKD${Date.now().toString().slice(-6)}NY`;
+    tx.mpesaReceiptNumber = `QKD${Date.now().toString().slice(-6)}SK`;
 
-    // Add to double-entry ledger!
     const newLedgerEntry: LedgerEntry = {
       id: `ledg-${Date.now().toString().slice(-4)}`,
       timestamp: new Date().toISOString(),
-      transactionType: 'MAMA_MBOGA_COLLECTION',
+      transactionType: 'TRADER_COLLECTION',
       debitAccount: 'MPESA_SETTLEMENT_SUSPENSE',
-      creditAccount: 'ESCROW_MAKADARA_NYANYA_01',
+      creditAccount: 'ESCROW_SOKO_SMART_POOL',
       amountKsh: tx.amount,
       referenceId: tx.mpesaReceiptNumber,
-      description: `M-PESA STK Push received from ${tx.vendorPhone} for agreement #${tx.referenceAgreementId || 'SS-MKD'}`
+      description: `M-PESA STK Push received from ${tx.phone} for agreement #${tx.referenceAgreementId || 'SK254'}`
     };
     ledger.unshift(newLedgerEntry);
 
-    // Also record platform commission (2.5%)
+    // 2.5% platform commission
     const commission = Math.round(tx.amount * 0.025);
     ledger.unshift({
       id: `ledg-comm-${Date.now().toString().slice(-4)}`,
       timestamp: new Date().toISOString(),
       transactionType: 'COMMISSION_FEE',
-      debitAccount: 'ESCROW_MAKADARA_NYANYA_01',
+      debitAccount: 'ESCROW_SOKO_SMART_POOL',
       creditAccount: 'SOKO_SMART_REVENUE',
       amountKsh: commission,
       referenceId: `FEE-${tx.mpesaReceiptNumber}`,
-      description: `Platform 2.5% coordination fee for order ${tx.referenceAgreementId || ''}`
+      description: `Platform 2.5% bulk coordination fee`
     });
 
     return res.json({ success: true, tx, ledgerEntry: newLedgerEntry });
@@ -1294,45 +1454,13 @@ app.post('/api/mpesa/simulate-phone-stk', (req: Request, res: Response) => {
   res.status(400).json({ error: 'Invalid PIN provided' });
 });
 
-// Daraja Webhook Callback Receiver
-app.post('/api/mpesa/callback', (req: Request, res: Response) => {
-  try {
-    const callbackData = req.body?.Body?.stkCallback;
-    if (callbackData) {
-      const checkoutReqId = callbackData.CheckoutRequestID;
-      const resultCode = callbackData.ResultCode;
-      const resultDesc = callbackData.ResultDesc;
-
-      const tx = mpesaTransactions.find(t => t.checkoutRequestId === checkoutReqId);
-      if (tx) {
-        tx.resultCode = resultCode;
-        tx.resultDesc = resultDesc;
-        if (resultCode === 0) {
-          tx.status = 'completed';
-          const items = callbackData.CallbackMetadata?.Item || [];
-          const receiptItem = items.find((i: any) => i.Name === 'MpesaReceiptNumber');
-          if (receiptItem) {
-            tx.mpesaReceiptNumber = receiptItem.Value;
-          }
-        } else {
-          tx.status = 'failed';
-        }
-      }
-    }
-    res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
-  } catch (err) {
-    res.status(500).json({ error: 'Callback processing error' });
-  }
-});
-
-// Ledger endpoint
 app.get('/api/ledger', (_req: Request, res: Response) => {
   const totalCollections = ledger
-    .filter(l => l.transactionType === 'MAMA_MBOGA_COLLECTION')
+    .filter(l => l.transactionType === 'TRADER_COLLECTION')
     .reduce((sum, l) => sum + l.amountKsh, 0);
 
   const totalPayouts = ledger
-    .filter(l => l.transactionType === 'COOPERATIVE_PAYOUT')
+    .filter(l => l.transactionType === 'SUPPLIER_PAYOUT')
     .reduce((sum, l) => sum + l.amountKsh, 0);
 
   const totalCommissions = ledger
@@ -1353,71 +1481,46 @@ app.get('/api/ledger', (_req: Request, res: Response) => {
   });
 });
 
-// Release Co-op Payout from Ops console
-app.post('/api/ledger/payout-coop', (req: Request, res: Response) => {
-  const { cooperativeId, amountKsh, agreementId } = req.body;
-  const coop = cooperatives.find(c => c.id === cooperativeId) || cooperatives[0];
+app.post('/api/ledger/payout-supplier', (req: Request, res: Response) => {
+  const { supplierId, amountKsh, agreementId } = req.body;
   const amount = Number(amountKsh) || 10000;
+  const supp = suppliers.find(s => s.id === supplierId) || suppliers[0];
 
-  const payoutReceipt = `B2B${Date.now().toString().slice(-6)}`;
-  const newLedgerEntry: LedgerEntry = {
-    id: `ledg-pay-${Date.now().toString().slice(-4)}`,
+  const receiptNum = `B2B${Date.now().toString().slice(-6)}SK`;
+
+  const payoutEntry: LedgerEntry = {
+    id: `ledg-payout-${Date.now().toString().slice(-4)}`,
     timestamp: new Date().toISOString(),
-    transactionType: 'COOPERATIVE_PAYOUT',
-    debitAccount: 'ESCROW_MAKADARA_NYANYA_01',
-    creditAccount: `COOP_SETTLEMENT_${coop.mpesaPaybill}`,
+    transactionType: 'SUPPLIER_PAYOUT',
+    debitAccount: 'ESCROW_SOKO_SMART_POOL',
+    creditAccount: `SUPPLIER_PAYBILL_${supp.mpesaPaybill}`,
     amountKsh: amount,
-    referenceId: payoutReceipt,
-    description: `Daraja B2B Paybill payment released to ${coop.name} (Paybill ${coop.mpesaPaybill}) for contract #${agreementId || 'SS-MKD'}`
+    referenceId: receiptNum,
+    description: `Daraja B2B Payout to ${supp.name} for agreement #${agreementId || 'SK254'}`
   };
-
-  ledger.unshift(newLedgerEntry);
+  ledger.unshift(payoutEntry);
 
   mpesaTransactions.unshift({
-    id: `tx-payout-${Date.now().toString().slice(-4)}`,
-    checkoutRequestId: `B2B_REQ_${Date.now()}`,
-    merchantRequestId: `MR_PAY_${Date.now()}`,
-    vendorPhone: coop.phone,
+    id: `tx-payout-${Date.now().toString().slice(-5)}`,
+    checkoutRequestId: `b2b_req_${Date.now()}`,
+    merchantRequestId: `MR_B2B_${Date.now()}`,
+    phone: supp.phone,
     amount,
-    purpose: 'coop_final_payout',
+    purpose: 'supplier_final_payout',
     status: 'completed',
-    mpesaReceiptNumber: payoutReceipt,
+    mpesaReceiptNumber: receiptNum,
     resultCode: 0,
-    resultDesc: 'B2B Paybill disbursement settled',
+    resultDesc: 'B2B Paybill payment completed',
     timestamp: new Date().toISOString(),
     referenceAgreementId: agreementId
   });
 
-  res.json({ success: true, ledgerEntry: newLedgerEntry });
+  res.json({ success: true, ledgerEntry: payoutEntry, receiptNumber: receiptNum });
 });
 
 // --- Disputes Desk ---
 app.get('/api/disputes', (_req: Request, res: Response) => {
   res.json(disputes);
-});
-
-app.post('/api/disputes', (req: Request, res: Response) => {
-  const { vendorId, description, produceName, claimedAmountKsh, issueType } = req.body;
-  const vendor = vendors.find(v => v.id === vendorId) || vendors[0];
-
-  const newDispute: DisputeTicket = {
-    id: `disp-${Date.now().toString().slice(-4)}`,
-    orderId: 'ord-today',
-    clusterId: 'cluster-makadara-nyanya-01',
-    vendorId: vendor.id,
-    vendorName: vendor.name,
-    vendorPhone: vendor.phone,
-    produceName: produceName || 'Nyanya',
-    issueType: issueType || 'rotten_produce',
-    description: description || 'Mboga ilikuwa imeoza au uzani ulikuwa pungufu.',
-    claimedAmountKsh: Number(claimedAmountKsh) || 350,
-    status: 'open',
-    evidencePhotoUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop&q=60',
-    createdAt: new Date().toISOString()
-  };
-
-  disputes.unshift(newDispute);
-  res.status(201).json(newDispute);
 });
 
 app.post('/api/disputes/:id/resolve', (req: Request, res: Response) => {
@@ -1426,75 +1529,67 @@ app.post('/api/disputes/:id/resolve', (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Dispute not found' });
   }
 
-  const { action, resolutionNotes, refundAmountKsh } = req.body;
-  dispute.status = action === 'refund' ? 'approved_refund' : action === 'replace' ? 'replacement_issued' : 'rejected';
-  dispute.resolutionNotes = resolutionNotes || 'Imeidhinishwa na Msimamizi wa Ops wa Makadara.';
+  const { action, refundAmountKsh, resolutionNotes } = req.body;
+  dispute.resolutionNotes = resolutionNotes;
 
   if (action === 'refund') {
-    const refundAmount = Number(refundAmountKsh) || dispute.claimedAmountKsh;
-    // Issue refund ledger transaction
+    dispute.status = 'approved_refund';
+    const refundAmt = Number(refundAmountKsh) || dispute.claimedAmountKsh;
+
+    const refundReceipt = `B2C_REF_${Date.now().toString().slice(-6)}`;
     ledger.unshift({
       id: `ledg-ref-${Date.now().toString().slice(-4)}`,
       timestamp: new Date().toISOString(),
       transactionType: 'DISPUTE_REFUND',
-      debitAccount: 'ESCROW_MAKADARA_NYANYA_01',
-      creditAccount: `VENDOR_${dispute.vendorPhone}`,
-      amountKsh: refundAmount,
-      referenceId: `REF-${dispute.id}`,
-      description: `M-PESA B2C Refund sent to ${dispute.vendorName} for verified dispute #${dispute.id}`
+      debitAccount: 'ESCROW_SOKO_SMART_POOL',
+      creditAccount: `TRADER_MPESA_${dispute.phone}`,
+      amountKsh: refundAmt,
+      referenceId: refundReceipt,
+      description: `M-PESA B2C Refund for dispute #${dispute.id} (${dispute.productName})`
     });
+
+    mpesaTransactions.unshift({
+      id: `tx-ref-${Date.now().toString().slice(-5)}`,
+      checkoutRequestId: `b2c_req_${Date.now()}`,
+      merchantRequestId: `MR_B2C_${Date.now()}`,
+      phone: dispute.phone,
+      amount: refundAmt,
+      purpose: 'refund_dispute',
+      status: 'completed',
+      mpesaReceiptNumber: refundReceipt,
+      resultCode: 0,
+      resultDesc: 'Daraja B2C dispute refund processed',
+      timestamp: new Date().toISOString()
+    });
+  } else if (action === 'replace') {
+    dispute.status = 'replacement_issued';
+  } else {
+    dispute.status = 'rejected';
   }
 
   res.json(dispute);
 });
 
-// --- Produce Ontology & Guardrails Config ---
+// --- Configurable Ontology per Trade ---
 app.get('/api/ontology', (_req: Request, res: Response) => {
-  res.json(produceCatalog);
-});
-
-app.put('/api/ontology/:id', (req: Request, res: Response) => {
-  const itemIndex = produceCatalog.findIndex(p => p.id === req.params.id);
-  if (itemIndex === -1) {
-    return res.status(404).json({ error: 'Produce item not found' });
-  }
-
-  produceCatalog[itemIndex] = {
-    ...produceCatalog[itemIndex],
-    ...req.body
-  };
-
-  res.json(produceCatalog[itemIndex]);
-});
-
-// --- Reputation Scores ---
-app.get('/api/reputation', (_req: Request, res: Response) => {
   res.json({
-    vendors: vendors.map(v => ({
-      id: v.id,
-      name: v.name,
-      ward: v.ward,
-      phone: v.phone,
-      ...v.reputationScore
-    })),
-    cooperatives: cooperatives.map(c => ({
-      id: c.id,
-      name: c.name,
-      region: c.region,
-      rating: c.rating,
-      minLotSizeKg: c.minLotSizeKg
-    }))
+    products,
+    categories: TRADE_CATEGORIES
   });
 });
 
-// ==========================================
-// 4. FRONTEND SERVING (Vite Dev / Dist Prod)
-// ==========================================
+app.put('/api/ontology/:id', (req: Request, res: Response) => {
+  const idx = products.findIndex(p => p.id === req.params.id);
+  if (idx !== -1) {
+    products[idx] = { ...products[idx], ...req.body };
+    return res.json(products[idx]);
+  }
+  res.status(404).json({ error: 'Product not found' });
+});
 
+// --- Frontend Dev & Production Mounting ---
 async function startServer() {
-  const isDev = process.env.NODE_ENV !== 'production';
-
-  if (isDev) {
+  if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1502,21 +1597,14 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(distPath, 'index.html'));
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`\n======================================================`);
-    console.log(` Soko Smart Engine Running on http://0.0.0.0:${PORT}`);
-    console.log(` Target Corridor: Makadara, Nairobi (Hamza, Maringo, Viwandani)`);
-    console.log(` Gemini API: ${geminiApiKey ? 'CONNECTED (@google/genai)' : 'STANDBY (Using Rule-based NLU)'}`);
-    console.log(` WhatsApp Webhook: POST /api/webhook/whatsapp`);
-    console.log(` Daraja M-PESA STK: Active in Sandbox Mode`);
-    console.log(`======================================================\n`);
+  app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`Soko Smart Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
