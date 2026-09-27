@@ -1,0 +1,6 @@
+{
+  "name": "Soko Smart - Agentic Produce Coordinator for Mama Mbogas",
+  "description": "Agentic AI coordinator pooling informal produce vendor demand over WhatsApp/SMS in Swahili and Sheng, negotiating with farm cooperatives, generating bilingual micro-agreements, and settling via M-PESA.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
