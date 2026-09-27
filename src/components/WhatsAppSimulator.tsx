@@ -29,6 +29,7 @@ interface WhatsAppSimulatorProps {
   onOrderCreated?: () => void;
   onAgreementConfirmed?: () => void;
   onOpenAgreementsTab: () => void;
+  onOpenLoginTab?: () => void;
 }
 
 interface MessageBubble {
@@ -48,7 +49,8 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
   setSelectedBusiness,
   onOrderCreated,
   onAgreementConfirmed,
-  onOpenAgreementsTab
+  onOpenAgreementsTab,
+  onOpenLoginTab
 }) => {
   const [messages, setMessages] = useState<MessageBubble[]>([]);
   const [inputText, setInputText] = useState('');
@@ -386,6 +388,19 @@ export const WhatsAppSimulator: React.FC<WhatsAppSimulatorProps> = ({
               );
             })}
           </div>
+
+          {onOpenLoginTab && (
+            <div className="mt-3 pt-3 border-t border-stone-200">
+              <button
+                type="button"
+                onClick={onOpenLoginTab}
+                className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-semibold flex items-center justify-between border border-emerald-200 transition-colors"
+              >
+                <span>🔐 Log In for Identity & Language</span>
+                <span className="text-[11px] font-mono text-emerald-700">Settings →</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Voice Note Audio Testing Deck */}

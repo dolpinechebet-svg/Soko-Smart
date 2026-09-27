@@ -298,7 +298,11 @@ export const INITIAL_BUSINESS_OWNERS: BusinessOwner[] = [
     },
     mpesaNumber: '254712998877',
     onboarded: true,
-    typicalNeeds: ['Saruji Bamburi', 'Mabati G30', 'Misumari']
+    typicalNeeds: ['Saruji Bamburi', 'Mabati G30', 'Misumari'],
+    nationalId: '29881726',
+    pin: '1234',
+    registeredDate: '2025-08-12',
+    verified: true
   },
   {
     id: 'biz-salon-wanjiru',
@@ -318,7 +322,11 @@ export const INITIAL_BUSINESS_OWNERS: BusinessOwner[] = [
     },
     mpesaNumber: '254722334455',
     onboarded: true,
-    typicalNeeds: ['Darling Abuja Braids', 'Herbal Shampoo 5L', 'Relaxer kits']
+    typicalNeeds: ['Darling Abuja Braids', 'Herbal Shampoo 5L', 'Relaxer kits'],
+    nationalId: '31045892',
+    pin: '1234',
+    registeredDate: '2025-10-04',
+    verified: true
   },
   {
     id: 'biz-produce-sarah',
@@ -338,7 +346,11 @@ export const INITIAL_BUSINESS_OWNERS: BusinessOwner[] = [
     },
     mpesaNumber: '254712345678',
     onboarded: true,
-    typicalNeeds: ['Nyanya', 'Vitunguu', 'Viazi', 'Sukuma Wiki']
+    typicalNeeds: ['Nyanya', 'Vitunguu', 'Viazi', 'Sukuma Wiki'],
+    nationalId: '25890123',
+    pin: '1234',
+    registeredDate: '2025-06-19',
+    verified: true
   },
   {
     id: 'biz-tailor-achieng',
@@ -358,7 +370,11 @@ export const INITIAL_BUSINESS_OWNERS: BusinessOwner[] = [
     },
     mpesaNumber: '254733667788',
     onboarded: true,
-    typicalNeeds: ['Kitambaa cha kanga', 'Uzi wa mashine', 'Zips']
+    typicalNeeds: ['Kitambaa cha kanga', 'Uzi wa mashine', 'Zips'],
+    nationalId: '33418290',
+    pin: '1234',
+    registeredDate: '2025-11-22',
+    verified: true
   },
   {
     id: 'biz-kibanda-mwangi',
@@ -378,7 +394,11 @@ export const INITIAL_BUSINESS_OWNERS: BusinessOwner[] = [
     },
     mpesaNumber: '254799112233',
     onboarded: true,
-    typicalNeeds: ['Mafuta ya kupikia 20L', 'Unga wa ugali bundles', 'Sukari']
+    typicalNeeds: ['Mafuta ya kupikia 20L', 'Unga wa ugali bundles', 'Sukari'],
+    nationalId: '27654310',
+    pin: '1234',
+    registeredDate: '2025-09-08',
+    verified: true
   }
 ];
 

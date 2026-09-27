@@ -7,6 +7,7 @@ import { MicroAgreementsView } from './components/MicroAgreementsView';
 import { MpesaLedgerView } from './components/MpesaLedgerView';
 import { DisputeDesk } from './components/DisputeDesk';
 import { ConfigOntology } from './components/ConfigOntology';
+import { LoginIdentityView } from './components/LoginIdentityView';
 import {
   BusinessOwner,
   ProductItem,
@@ -15,7 +16,8 @@ import {
   MicroAgreement,
   WholesaleSupplier,
   DisputeTicket,
-  BusinessTradeCategory
+  BusinessTradeCategory,
+  Language
 } from './types';
 import {
   INITIAL_BUSINESS_OWNERS,
@@ -44,6 +46,19 @@ export default function App() {
   );
   const [geminiConnected, setGeminiConnected] = useState<boolean>(true);
 
+  // Language preferences state with localStorage persistence
+  const [currentLanguage, setCurrentLanguage] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('soko_smart_lang') as Language;
+      if (saved && ['swahili', 'sheng', 'english', 'mixed'].includes(saved)) {
+        return saved;
+      }
+    } catch {
+      // fallback to initial
+    }
+    return INITIAL_BUSINESS_OWNERS[0]?.preferredLanguage || 'swahili';
+  });
+
   // Initial load from server
   useEffect(() => {
     fetchHealth();
@@ -64,11 +79,12 @@ export default function App() {
 
   const refreshAllData = async () => {
     try {
-      const [demandRes, agreementsRes, disputesRes, ontologyRes] = await Promise.all([
+      const [demandRes, agreementsRes, disputesRes, ontologyRes, usersRes] = await Promise.all([
         fetch('/api/demand/clusters'),
         fetch('/api/agreements'),
         fetch('/api/disputes'),
-        fetch('/api/ontology')
+        fetch('/api/ontology'),
+        fetch('/api/users')
       ]);
 
       if (demandRes.ok) {
@@ -90,8 +106,41 @@ export default function App() {
         const data = await ontologyRes.json();
         if (Array.isArray(data)) setProducts(data);
       }
+      if (usersRes.ok) {
+        const data = await usersRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setBusinesses(data);
+          // Keep selectedBusiness in sync if present
+          setSelectedBusiness(prev => {
+            const found = data.find((b: BusinessOwner) => b.id === prev.id);
+            return found || prev;
+          });
+        }
+      }
     } catch (err) {
       console.warn('Initial data load warning:', err);
+    }
+  };
+
+  const handleLanguageChange = (newLang: Language) => {
+    setCurrentLanguage(newLang);
+    try {
+      localStorage.setItem('soko_smart_lang', newLang);
+    } catch {
+      // ignore storage errors
+    }
+    if (selectedBusiness) {
+      setSelectedBusiness(prev => ({ ...prev, preferredLanguage: newLang }));
+    }
+  };
+
+  const handleUserLogin = (user: BusinessOwner) => {
+    setSelectedBusiness(user);
+    if (user.preferredLanguage) {
+      handleLanguageChange(user.preferredLanguage);
+    }
+    if (user.category) {
+      setSelectedTrade(user.category);
     }
   };
 
@@ -144,7 +193,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-stone-900 font-sans flex flex-col">
-      {/* Top Application Header */}
+      {/* Top Application Header with Language Preferences & Identity */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -153,10 +202,26 @@ export default function App() {
         pendingAgreementsCount={pendingAgreementsCount}
         selectedTradeFilter={selectedTrade}
         setSelectedTradeFilter={val => setSelectedTrade(val as BusinessTradeCategory | 'all')}
+        currentLanguage={currentLanguage}
+        onLanguageChange={handleLanguageChange}
+        currentUser={selectedBusiness}
       />
 
       {/* Main Workspace Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Log In & Identity Tab View */}
+        {activeTab === 'login' && (
+          <LoginIdentityView
+            currentLanguage={currentLanguage}
+            onLanguageChange={handleLanguageChange}
+            currentUser={selectedBusiness}
+            onUserLogin={handleUserLogin}
+            allBusinesses={businesses}
+            onRefreshBusinesses={refreshAllData}
+            onNavigateToWhatsApp={() => setActiveTab('whatsapp')}
+          />
+        )}
+
         {activeTab === 'whatsapp' && (
           <WhatsAppSimulator
             businesses={businesses}
@@ -165,6 +230,7 @@ export default function App() {
             onOrderCreated={refreshAllData}
             onAgreementConfirmed={refreshAllData}
             onOpenAgreementsTab={() => setActiveTab('agreements')}
+            onOpenLoginTab={() => setActiveTab('login')}
           />
         )}
 

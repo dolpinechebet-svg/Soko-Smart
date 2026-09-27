@@ -60,6 +60,16 @@ export interface BusinessOwner {
   mpesaNumber: string;
   onboarded: boolean;
   typicalNeeds: string[];
+  nationalId?: string;
+  pin?: string;
+  registeredDate?: string;
+  verified?: boolean;
+}
+
+export interface AuthSession {
+  user: BusinessOwner;
+  loginTime: string;
+  authMethod: 'quick_select' | 'phone_pin' | 'registered';
 }
 
 export interface DemandOrder {

@@ -1,6 +1,17 @@
-import React from 'react';
-import { ShoppingBag, PhoneCall, ShieldCheck, Cpu, Layers } from 'lucide-react';
-import { BusinessTradeCategory } from '../types';
+import React, { useState } from 'react';
+import {
+  User,
+  Globe,
+  PhoneCall,
+  ShieldCheck,
+  Cpu,
+  CheckCircle2,
+  ChevronDown,
+  Layers,
+  ArrowRight
+} from 'lucide-react';
+import { BusinessOwner, Language, BusinessTradeCategory } from '../types';
+import { getTranslations } from '../utils/translations';
 
 interface NavbarProps {
   activeTab: string;
@@ -10,6 +21,9 @@ interface NavbarProps {
   pendingAgreementsCount: number;
   selectedTradeFilter: string;
   setSelectedTradeFilter: (trade: string) => void;
+  currentLanguage: Language;
+  onLanguageChange: (lang: Language) => void;
+  currentUser: BusinessOwner;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,24 +33,38 @@ export const Navbar: React.FC<NavbarProps> = ({
   unresolvedDisputesCount,
   pendingAgreementsCount,
   selectedTradeFilter,
-  setSelectedTradeFilter
+  setSelectedTradeFilter,
+  currentLanguage,
+  onLanguageChange,
+  currentUser
 }) => {
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const t = getTranslations(currentLanguage);
+
   const tabs = [
-    { id: 'whatsapp', label: 'WhatsApp / SMS Chat', badge: null },
-    { id: 'clustering', label: 'Multi-Trade Clustering', badge: null },
-    { id: 'negotiation', label: 'Supplier Negotiation', badge: null },
-    { id: 'agreements', label: 'Bilingual Agreements', badge: pendingAgreementsCount > 0 ? pendingAgreementsCount : null },
-    { id: 'mpesa', label: 'M-PESA & Escrow', badge: null },
-    { id: 'disputes', label: 'Disputes ("TATIZO")', badge: unresolvedDisputesCount > 0 ? unresolvedDisputesCount : null },
-    { id: 'ontology', label: 'Trade Ontologies & Bands', badge: null }
+    { id: 'whatsapp', label: t.tabs.whatsapp, badge: null },
+    { id: 'clustering', label: t.tabs.clustering, badge: null },
+    { id: 'negotiation', label: t.tabs.negotiation, badge: null },
+    { id: 'agreements', label: t.tabs.agreements, badge: pendingAgreementsCount > 0 ? pendingAgreementsCount : null },
+    { id: 'mpesa', label: t.tabs.mpesa, badge: null },
+    { id: 'disputes', label: t.tabs.disputes, badge: unresolvedDisputesCount > 0 ? unresolvedDisputesCount : null },
+    { id: 'ontology', label: t.tabs.ontology, badge: null },
+    { id: 'login', label: t.tabs.login, badge: null, isAuthTab: true }
   ];
+
+  const languageLabels: Record<Language, { label: string; short: string; flag: string }> = {
+    swahili: { label: 'Kiswahili Sanifu', short: 'Kiswahili', flag: '🇰🇪' },
+    sheng: { label: 'Sheng ya Mtaa', short: 'Sheng', flag: '🇰🇪' },
+    english: { label: 'English (UK/KE)', short: 'English', flag: '🇬🇧' },
+    mixed: { label: 'Soko Mix (Swahili/Eng)', short: 'Mixed', flag: '🇰🇪' }
+  };
 
   return (
     <header className="bg-[#0b2416] text-white border-b border-[#1b442d] sticky top-0 z-30 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => setActiveTab('whatsapp')}>
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 font-extrabold text-base shadow-inner tracking-wider">
               SS
             </div>
@@ -45,37 +73,121 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-emerald-100 to-emerald-300 bg-clip-text text-transparent">
                   Soko Smart
                 </span>
-                <span className="text-[11px] bg-emerald-900/90 text-emerald-300 font-semibold px-2 py-0.5 rounded border border-emerald-700/60">
+                <span className="text-[11px] bg-emerald-900/90 text-emerald-300 font-semibold px-2 py-0.5 rounded border border-emerald-700/60 hidden sm:inline-block">
                   Agentic B2B Coordinator
                 </span>
               </div>
-              <p className="text-[11px] text-emerald-200/80 font-normal">
+              <p className="text-[11px] text-emerald-200/80 font-normal hidden md:block">
                 Trade-Agnostic Demand Pooling for Kenyan Small Businesses · Swahili · Sheng · English
               </p>
             </div>
           </div>
 
-          {/* System Telemetry & Status */}
-          <div className="hidden lg:flex items-center gap-4 text-xs text-emerald-100/80">
-            <div className="flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-              <span>NLU: {geminiConnected ? 'Gemini 3.8 Flash' : 'Swahili/Sheng Engine'}</span>
+          {/* Right Controls: Telemetry, Language Preferences Dropdown & User Identity Profile */}
+          <div className="flex items-center gap-3">
+            {/* System Status Indicators (Desktop) */}
+            <div className="hidden xl:flex items-center gap-3 text-xs text-emerald-100/70 border-r border-emerald-900/80 pr-3">
+              <div className="flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{geminiConnected ? 'Gemini 3.8' : 'NLU Active'}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Daraja Escrow</span>
+              </div>
             </div>
-            <span className="text-emerald-700">|</span>
-            <div className="flex items-center gap-1.5">
-              <PhoneCall className="w-3.5 h-3.5 text-emerald-400" />
-              <span>WhatsApp Cloud API</span>
+
+            {/* Quick Language Preference Selector (User requested: "and also where to change the language preferences") */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-900/80 hover:bg-emerald-850 text-white text-xs font-semibold border border-emerald-700/60 transition-colors shadow-xs"
+                title="Change language preferences"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-300" />
+                <span>{languageLabels[currentLanguage]?.flag}</span>
+                <span className="hidden sm:inline">{languageLabels[currentLanguage]?.short}</span>
+                <ChevronDown className="w-3 h-3 text-emerald-300" />
+              </button>
+
+              {langDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setLangDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white text-stone-900 shadow-xl border border-stone-200 py-1.5 z-50 animate-fadeIn">
+                    <div className="px-3 py-1.5 text-[11px] font-bold text-stone-400 uppercase tracking-wider border-b border-stone-100">
+                      Lugha / Language Preferences
+                    </div>
+                    {(Object.keys(languageLabels) as Language[]).map(langKey => {
+                      const isSelected = currentLanguage === langKey;
+                      return (
+                        <button
+                          key={langKey}
+                          onClick={() => {
+                            onLanguageChange(langKey);
+                            setLangDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3.5 py-2 text-xs font-medium flex items-center justify-between hover:bg-emerald-50 transition-colors ${
+                            isSelected ? 'bg-emerald-50/80 text-emerald-900 font-bold' : 'text-stone-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>{languageLabels[langKey].flag}</span>
+                            <span>{languageLabels[langKey].label}</span>
+                          </div>
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                        </button>
+                      );
+                    })}
+                    <div className="p-2 border-t border-stone-100">
+                      <button
+                        onClick={() => {
+                          setActiveTab('login');
+                          setLangDropdownOpen(false);
+                        }}
+                        className="w-full text-center py-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        More Language & Identity Settings →
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <span className="text-emerald-700">|</span>
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Daraja M-PESA STK & Escrow</span>
-            </div>
+
+            {/* Individual Identity Login / Profile Card Button */}
+            <button
+              onClick={() => setActiveTab('login')}
+              className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                activeTab === 'login'
+                  ? 'bg-emerald-800 text-white border-emerald-400 ring-2 ring-emerald-400/40 shadow-sm'
+                  : 'bg-emerald-950/70 hover:bg-emerald-900/90 text-white border-emerald-700/60'
+              }`}
+              title="View identity or switch trader"
+            >
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold text-xs shrink-0">
+                {currentUser?.ownerName
+                  ? currentUser.ownerName.split(' ').map(n => n[0]).slice(0, 2).join('')
+                  : 'ID'}
+              </div>
+              <div className="text-left hidden sm:block">
+                <div className="font-bold text-xs leading-tight text-white flex items-center gap-1">
+                  <span>{currentUser?.ownerName || 'Log In / Identity'}</span>
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                </div>
+                <div className="text-[10px] text-emerald-300/80 leading-tight truncate max-w-[130px]">
+                  {currentUser?.businessName || 'Verified Trader'}
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 overflow-x-auto py-2 border-t border-[#163825] scrollbar-none">
+        <div className="flex space-x-1 overflow-x-auto py-2 border-t border-[#163825] scrollbar-none items-center">
           {tabs.map(tab => {
             const isActive = activeTab === tab.id;
             return (
@@ -85,9 +197,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className={`whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
                   isActive
                     ? 'bg-emerald-800 text-white font-semibold shadow-xs'
+                    : tab.isAuthTab
+                    ? 'text-emerald-300 bg-emerald-900/40 hover:bg-emerald-900/70 hover:text-white border border-emerald-700/50'
                     : 'text-emerald-100/70 hover:text-white hover:bg-emerald-900/40'
                 }`}
               >
+                {tab.isAuthTab && <User className="w-3 h-3 text-emerald-400" />}
                 <span>{tab.label}</span>
                 {tab.badge !== null && (
                   <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950">

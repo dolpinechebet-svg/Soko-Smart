@@ -1587,6 +1587,117 @@ app.put('/api/ontology/:id', (req: Request, res: Response) => {
   res.status(404).json({ error: 'Product not found' });
 });
 
+// --- Trader Identity & Auth Endpoints ---
+app.get('/api/users', (_req: Request, res: Response) => {
+  res.json(businesses);
+});
+
+app.post('/api/auth/login', (req: Request, res: Response) => {
+  const { businessId, phone, pin } = req.body;
+
+  let matched: BusinessOwner | undefined;
+  if (businessId) {
+    matched = businesses.find(b => b.id === businessId);
+  } else if (phone) {
+    const cleanedPhone = phone.replace(/[^0-9]/g, '');
+    matched = businesses.find(b => {
+      const bPhoneClean = b.phone.replace(/[^0-9]/g, '');
+      const bMpesaClean = b.mpesaNumber.replace(/[^0-9]/g, '');
+      return bPhoneClean.endsWith(cleanedPhone.slice(-9)) || bMpesaClean.endsWith(cleanedPhone.slice(-9));
+    });
+  }
+
+  if (!matched) {
+    return res.status(404).json({ error: 'Trader identity not found. Please register or select an existing profile.' });
+  }
+
+  if (pin && matched.pin && matched.pin !== pin) {
+    return res.status(401).json({ error: 'Incorrect 4-digit PIN. Please try again.' });
+  }
+
+  res.json({
+    user: matched,
+    token: `sk-session-${matched.id}-${Date.now()}`,
+    authMethod: businessId ? 'quick_select' : 'phone_pin'
+  });
+});
+
+app.post('/api/auth/register', (req: Request, res: Response) => {
+  const {
+    ownerName,
+    businessName,
+    category,
+    phone,
+    ward,
+    locationDesc,
+    preferredLanguage,
+    nationalId,
+    typicalNeeds,
+    pin
+  } = req.body;
+
+  if (!ownerName || !businessName || !phone) {
+    return res.status(400).json({ error: 'Owner name, business name, and phone number are required.' });
+  }
+
+  const cleanedPhone = phone.startsWith('+254') ? phone : (phone.startsWith('0') ? `+254${phone.slice(1)}` : `+254${phone}`);
+  const mpesaNumber = cleanedPhone.replace('+', '');
+
+  const newTrader: BusinessOwner = {
+    id: `biz-${category || 'general'}-${Date.now().toString().slice(-5)}`,
+    businessName,
+    ownerName,
+    category: category || 'general_duka',
+    phone: cleanedPhone,
+    ward: ward || 'Nairobi Central',
+    locationDesc: locationDesc || 'Local Shop',
+    preferredLanguage: preferredLanguage || 'swahili',
+    reputationScore: {
+      fulfillmentRate: 100,
+      onTimeRate: 100,
+      disputeRate: 0,
+      totalOrders: 0,
+      rating: 5.0
+    },
+    mpesaNumber,
+    onboarded: true,
+    typicalNeeds: Array.isArray(typicalNeeds) ? typicalNeeds : (typicalNeeds ? typicalNeeds.split(',').map((s: string) => s.trim()) : []),
+    nationalId: nationalId || '',
+    pin: pin || '1234',
+    registeredDate: new Date().toISOString().split('T')[0],
+    verified: true
+  };
+
+  businesses.unshift(newTrader);
+
+  res.status(201).json({
+    user: newTrader,
+    token: `sk-session-${newTrader.id}-${Date.now()}`,
+    authMethod: 'registered'
+  });
+});
+
+app.put('/api/users/:id/language', (req: Request, res: Response) => {
+  const { preferredLanguage } = req.body;
+  const user = businesses.find(b => b.id === req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  if (preferredLanguage) {
+    user.preferredLanguage = preferredLanguage;
+  }
+  res.json({ success: true, user });
+});
+
+app.put('/api/users/:id', (req: Request, res: Response) => {
+  const user = businesses.find(b => b.id === req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  Object.assign(user, req.body);
+  res.json({ success: true, user });
+});
+
 // --- Frontend Dev & Production Mounting ---
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
